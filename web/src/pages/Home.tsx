@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Link2, Sparkles, ShoppingBag, ArrowRight, BookOpen, Trophy } from 'lucide-react'
+import { Link2, Sparkles, ShoppingBag, ArrowRight, BookOpen, Trophy, CalendarRange, Library as LibraryIcon } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
 import { api } from '@/api/client'
 import { useAuth } from '@/store/auth'
@@ -73,10 +73,25 @@ export default function Home() {
       </button>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <button
-          onClick={() => navigate('/chat')}
-          className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card"
-        >
+        <button onClick={() => navigate('/plans')} className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600">
+            <CalendarRange size={18} />
+          </div>
+          <div className="text-left">
+            <div className="text-xs text-ink-500">学习计划</div>
+            <div className="text-sm font-bold">AI 一键排期</div>
+          </div>
+        </button>
+        <button onClick={() => navigate('/library')} className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600">
+            <LibraryIcon size={18} />
+          </div>
+          <div className="text-left">
+            <div className="text-xs text-ink-500">我的视频解析</div>
+            <div className="text-sm font-bold">查看历史课程</div>
+          </div>
+        </button>
+        <button onClick={() => navigate('/chat')} className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600">
             <Sparkles size={18} />
           </div>
@@ -85,10 +100,7 @@ export default function Home() {
             <div className="text-sm font-bold">和书院熊聊聊</div>
           </div>
         </button>
-        <button
-          onClick={() => navigate('/me')}
-          className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card"
-        >
+        <button onClick={() => navigate('/me')} className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600">
             <Trophy size={18} />
           </div>

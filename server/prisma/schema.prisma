@@ -25,6 +25,7 @@ model User {
   chatSessions ChatSession[]
   achievements UserAchievement[]
   orders       Order[]
+  plans        StudyPlan[]
 }
 
 // 学习课程（由用户从视频链接生成，或由系统推荐）
@@ -175,6 +176,44 @@ model Order {
 
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]
+}
+
+// 学习计划（可被 Home / Course / Chat 三个模块共同调用）
+model StudyPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  goal        String?
+  startDate   String   // YYYY-MM-DD
+  endDate     String   // YYYY-MM-DD
+  weeklyHours Float    @default(5)
+  status      String   @default("active") // active / done / archived
+  color       String   @default("#fb7c2d")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id])
+  items StudyPlanItem[]
+
+  @@index([userId, status])
+}
+
+model StudyPlanItem {
+  id       String   @id @default(cuid())
+  planId   String
+  date     String   // YYYY-MM-DD
+  title    String
+  courseId String?
+  minutes  Int      @default(45)
+  note     String?
+  done     Boolean  @default(false)
+  doneAt   DateTime?
+  order    Int      @default(0)
+  createdAt DateTime @default(now())
+
+  plan StudyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, date])
 }
 
 model OrderItem {

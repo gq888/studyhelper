@@ -133,10 +133,11 @@ export async function aiRoutes(app: FastifyInstance) {
         sessionId: z.string(),
         message: z.string().min(1).max(2000),
         courseId: z.string().optional(),
+        courseIds: z.array(z.string()).optional(),
       })
       .safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'bad_input' })
-    const { sessionId, message, courseId } = parsed.data
+    const { sessionId, message, courseId, courseIds } = parsed.data
 
     const session = await prisma.chatSession.findUnique({
       where: { id: sessionId },
@@ -145,11 +146,21 @@ export async function aiRoutes(app: FastifyInstance) {
     if (!session || session.userId !== req.userId)
       return reply.code(404).send({ error: 'session_not_found' })
 
+    // 整合所有引用课程
+    const allIds = Array.from(new Set([...(courseIds ?? []), ...(courseId ? [courseId] : [])]))
     let courseContext = ''
-    if (courseId) {
-      const c = await prisma.course.findUnique({ where: { id: courseId } })
-      if (c) {
-        courseContext = `\n\n当前学习课程信息：标题《${c.title}》；副标题：${c.subtitle ?? ''}；目标：${c.objectives}；大纲：${c.outline}`
+    if (allIds.length > 0) {
+      const courses = await prisma.course.findMany({ where: { id: { in: allIds } } })
+      if (courses.length) {
+        courseContext =
+          '\n\n用户已引用以下课程作为本次对话的背景资料：\n' +
+          courses
+            .map(
+              (c, i) =>
+                `【${i + 1}】《${c.title}》${c.subtitle ? '- ' + c.subtitle : ''}\n   学习目标: ${c.objectives}\n   章节大纲: ${c.outline}`,
+            )
+            .join('\n') +
+          '\n\n当用户问与课程相关的内容时优先基于上述资料回答。'
       }
     }
 

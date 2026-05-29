@@ -3,8 +3,10 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   CalendarCheck2,
+  CalendarRange,
   ChevronRight,
   Flame,
+  Library as LibraryIcon,
   LogOut,
   Receipt,
   Settings,
@@ -156,7 +158,31 @@ export default function Profile() {
 
       {/* 入口列表 */}
       <section className="mt-4">
-        <button onClick={() => nav('/mall')} className="card flex w-full items-center justify-between p-4">
+        <button onClick={() => nav('/plans')} className="card flex w-full items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <CalendarRange size={20} />
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-bold">学习计划</div>
+              <div className="text-[11px] text-ink-500">AI 排期 + 真实打卡联动</div>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-ink-500" />
+        </button>
+        <button onClick={() => nav('/library')} className="card mt-3 flex w-full items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <LibraryIcon size={20} />
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-bold">我的视频解析</div>
+              <div className="text-[11px] text-ink-500">所有 AI 提取过的课程</div>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-ink-500" />
+        </button>
+        <button onClick={() => nav('/mall')} className="card mt-3 flex w-full items-center justify-between p-4">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
               <ShoppingBag size={20} />
@@ -168,7 +194,7 @@ export default function Profile() {
           </div>
           <ChevronRight size={18} className="text-ink-500" />
         </button>
-        <button onClick={() => nav('/orders')} className="card mt-3 flex w-full items-center justify-between p-4">
+        <button onClick={() => nav('/orders')} className="card mt-3 flex w-full items-center justify-between p-4 first-of-type:mt-0">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
               <Receipt size={20} />

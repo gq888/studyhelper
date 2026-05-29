@@ -41,7 +41,18 @@ const createSchema = z.object({
 export async function courseRoutes(app: FastifyInstance) {
   app.get('/courses', async (req) => {
     const q = (req.query as any) ?? {}
-    const where: any = { isPublic: true }
+    const where: any = {}
+    const wantsMine = q.ownerOnly === 'true' || q.ownerOnly === '1'
+    if (wantsMine) {
+      try {
+        const decoded = (await (req as any).jwtVerify()) as { sub: string }
+        where.ownerId = decoded.sub
+      } catch {
+        return []
+      }
+    } else {
+      where.isPublic = true
+    }
     if (q.category) where.category = q.category
     if (q.search) where.title = { contains: q.search }
     const items = await prisma.course.findMany({

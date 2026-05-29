@@ -14,6 +14,9 @@ import Mall from '@/pages/Mall'
 import Product from '@/pages/Product'
 import Cart from '@/pages/Cart'
 import Orders from '@/pages/Orders'
+import Library from '@/pages/Library'
+import Plans from '@/pages/Plans'
+import PlanDetail from '@/pages/PlanDetail'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth()
@@ -53,6 +56,9 @@ export default function App() {
           <Route path="/product/:id" element={<RequireAuth><Product /></RequireAuth>} />
           <Route path="/cart" element={<RequireAuth><Cart /></RequireAuth>} />
           <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} />
+          <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
+          <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
+          <Route path="/plans/:id" element={<RequireAuth><PlanDetail /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

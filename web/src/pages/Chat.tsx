@@ -159,7 +159,8 @@ export default function Chat() {
 
   const handleSend = (t?: string) => {
     const text = (t ?? input).trim()
-    if (!text || !sessionId || send.isPending || streamingId) return
+    // sessionId 由 send mutation 在首条消息时懒创建，这里不再阻塞
+    if (!text || send.isPending || streamingId) return
     setInput('')
     send.mutate(text)
   }

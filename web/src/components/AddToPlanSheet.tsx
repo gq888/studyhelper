@@ -50,6 +50,24 @@ export function AddToPlanSheet({ open, onClose, draft }: AddToPlanSheetProps) {
         </div>
         <p className="mt-1 text-xs text-ink-500">把「{draft.title}」加入哪个计划？</p>
 
+        {draft.courseId && (
+          <button
+            onClick={() => {
+              onClose()
+              nav(`/plans?ai=1&courseId=${draft.courseId}`)
+            }}
+            className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-3 text-left shadow-card transition active:scale-[0.99]"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20 text-white">
+              <Sparkles size={18} />
+            </div>
+            <div className="flex-1 text-white">
+              <div className="text-[11px] opacity-85">推荐</div>
+              <div className="text-sm font-bold leading-tight">基于本课程让 AI 生成一份完整计划</div>
+            </div>
+          </button>
+        )}
+
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-brand-50 p-3 text-sm">
           <span className="text-ink-500">安排到</span>
           <input
@@ -91,8 +109,14 @@ export function AddToPlanSheet({ open, onClose, draft }: AddToPlanSheetProps) {
           <button onClick={() => { onClose(); nav('/plans?new=1') }} className="btn-ghost">
             <Plus size={14} /> 新建空计划
           </button>
-          <button onClick={() => { onClose(); nav('/plans?ai=1') }} className="btn-primary">
-            <Sparkles size={14} /> AI 生成
+          <button
+            onClick={() => {
+              onClose()
+              nav(`/plans?ai=1${draft.courseId ? `&courseId=${draft.courseId}` : ''}`)
+            }}
+            className="btn-ghost"
+          >
+            <Sparkles size={14} /> AI 自由排期
           </button>
         </div>
       </div>

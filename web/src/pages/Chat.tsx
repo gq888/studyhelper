@@ -7,6 +7,7 @@ import { Mascot } from '@/components/Mascot'
 import { PomoTimer } from '@/components/Timer'
 import { ChatSessionsDrawer } from '@/components/ChatSessionsDrawer'
 import { CoursePicker } from '@/components/CoursePicker'
+import { PlanProposalCard, extractPlanProposal } from '@/components/PlanProposalCard'
 import { api, aiStream } from '@/api/client'
 
 interface Message {
@@ -242,7 +243,9 @@ export default function Chat() {
           {messages.map((m) => {
             const isUser = m.role === 'user'
             const timer = !isUser ? extractTimer(m.content) : null
-            const text = timer ? timer.clean : m.content
+            const planProposal = !isUser ? extractPlanProposal(timer ? timer.clean : m.content) : null
+            // 两个标记可同时出现，先剔 timer 再剔 plan
+            const text = (planProposal ? planProposal.clean : timer ? timer.clean : m.content)
             return (
               <div key={m.id} className={`mb-3 flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                 {!isUser && (
@@ -251,10 +254,16 @@ export default function Chat() {
                   </div>
                 )}
                 <div className={`max-w-[78%] space-y-2 ${isUser ? 'items-end' : ''}`}>
-                  <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-card ${isUser ? 'bg-brand-500 text-white' : 'bg-white text-ink-900'}`}>
-                    {text || (m.id === streamingId ? '...' : '')}
-                  </div>
+                  {text && (
+                    <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-card ${isUser ? 'bg-brand-500 text-white' : 'bg-white text-ink-900'}`}>
+                      {text}
+                    </div>
+                  )}
+                  {!text && m.id === streamingId && (
+                    <div className="rounded-2xl bg-white px-3.5 py-2.5 text-sm shadow-card">...</div>
+                  )}
                   {timer && <PomoTimer minutes={timer.mins} label={timer.label} />}
+                  {planProposal && <PlanProposalCard proposal={planProposal} />}
                 </div>
               </div>
             )

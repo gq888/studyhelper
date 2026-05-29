@@ -113,7 +113,12 @@ export default function PlanDetail() {
       <div className="mt-5 flex items-center gap-2 text-sm font-bold">
         <ListChecks size={16} /> 任务列表
         <button
-          onClick={() => nav(`/chat?planId=${plan.id}`)}
+          onClick={() => {
+            const qs = new URLSearchParams({ planId: plan.id })
+            const ids = (plan.courses ?? []).map((c) => c.id).filter(Boolean)
+            if (ids.length) qs.set('courseIds', ids.join(','))
+            nav(`/chat?${qs.toString()}`)
+          }}
           className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600"
         >
           <MessageCircle size={12} /> 让书院熊答疑

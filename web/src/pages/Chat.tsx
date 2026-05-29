@@ -49,6 +49,11 @@ export default function Chat() {
   const nav = useNavigate()
   const qc = useQueryClient()
   const initialCourseId = new URLSearchParams(search).get('courseId') || undefined
+  // 计划答疑场景：plan 引用的课程通过 courseIds=a,b 传过来
+  const initialCourseIds = (new URLSearchParams(search).get('courseIds') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 
   const [sessionId, setSessionId] = useState<string | undefined>(paramId)
   const [input, setInput] = useState('')
@@ -57,7 +62,12 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [citedCourseIds, setCitedCourseIds] = useState<string[]>(initialCourseId ? [initialCourseId] : [])
+  const [citedCourseIds, setCitedCourseIds] = useState<string[]>(() => {
+    const acc = new Set<string>()
+    if (initialCourseId) acc.add(initialCourseId)
+    for (const id of initialCourseIds) acc.add(id)
+    return Array.from(acc)
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // 引用课程标签
@@ -81,11 +91,17 @@ export default function Chat() {
     api<{ messages: Message[] }>(`/chat/sessions/${sessionId}`).then((s) => setMessages(s.messages || [])).catch(() => null)
   }, [sessionId])
 
-  // 从课程详情页跳过来时自动引用该课程（URL 上的 courseId 变化都触发）
+  // 从课程详情页或学习计划答疑跳过来时自动引用对应课程
   useEffect(() => {
-    if (!initialCourseId) return
-    setCitedCourseIds((ids) => (ids.includes(initialCourseId) ? ids : [...ids, initialCourseId]))
-  }, [initialCourseId])
+    const incoming = [initialCourseId, ...initialCourseIds].filter(Boolean) as string[]
+    if (incoming.length === 0) return
+    setCitedCourseIds((ids) => {
+      const next = new Set(ids)
+      for (const id of incoming) next.add(id)
+      return next.size === ids.length ? ids : Array.from(next)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCourseId, initialCourseIds.join(',')])
 
   // 历史会话数量（用于按钮徽标）
   const { data: sessionsForBadge = [] } = useQuery({

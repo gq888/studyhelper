@@ -80,6 +80,12 @@ export default function Chat() {
     api<{ messages: Message[] }>(`/chat/sessions/${sessionId}`).then((s) => setMessages(s.messages || [])).catch(() => null)
   }, [sessionId])
 
+  // 从课程详情页跳过来时自动引用该课程（URL 上的 courseId 变化都触发）
+  useEffect(() => {
+    if (!initialCourseId) return
+    setCitedCourseIds((ids) => (ids.includes(initialCourseId) ? ids : [...ids, initialCourseId]))
+  }, [initialCourseId])
+
   // 历史会话数量（用于按钮徽标）
   const { data: sessionsForBadge = [] } = useQuery({
     queryKey: ['chat-sessions'],

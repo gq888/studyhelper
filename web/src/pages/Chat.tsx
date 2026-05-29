@@ -20,6 +20,13 @@ interface Session {
   id: string
   title: string
   updatedAt: string
+  messageCount?: number
+}
+
+/** 从首条用户消息生成会话标题：去除多余空白，截到 24 字 */
+function titleFromMessage(text: string): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim()
+  return (cleaned.length > 24 ? cleaned.slice(0, 24) + '…' : cleaned) || '新对话'
 }
 
 const SUGGESTIONS = [
@@ -64,24 +71,21 @@ export default function Chat() {
     },
   })
 
-  // 初次进入：若无 sessionId，则创建一个
+  // 拉取历史消息（仅当切换到已有 sessionId 时）
   useEffect(() => {
-    (async () => {
-      if (sessionId) return
-      const s = await api<Session>('/chat/sessions', {
-        method: 'POST',
-        json: { courseId: initialCourseId, title: initialCourseId ? '课程陪学' : '日常陪学' },
-      })
-      setSessionId(s.id)
-      qc.invalidateQueries({ queryKey: ['chat-sessions'] })
-    })().catch(() => toast.error('无法创建会话'))
-  }, [sessionId, initialCourseId, qc])
-
-  // 拉取历史消息
-  useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId) {
+      setMessages([])
+      return
+    }
     api<{ messages: Message[] }>(`/chat/sessions/${sessionId}`).then((s) => setMessages(s.messages || [])).catch(() => null)
   }, [sessionId])
+
+  // 历史会话数量（用于按钮徽标）
+  const { data: sessionsForBadge = [] } = useQuery({
+    queryKey: ['chat-sessions'],
+    queryFn: () => api<Session[]>('/chat/sessions'),
+    refetchOnWindowFocus: false,
+  })
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -89,7 +93,17 @@ export default function Chat() {
 
   const send = useMutation({
     mutationFn: async (text: string) => {
-      if (!sessionId) throw new Error('no session')
+      // 懒创建：直到用户真正发出消息才在后端创建会话；标题用首条用户消息生成
+      let sid = sessionId
+      if (!sid) {
+        const created = await api<Session>('/chat/sessions', {
+          method: 'POST',
+          json: { courseId: initialCourseId, title: titleFromMessage(text) },
+        })
+        sid = created.id
+        setSessionId(sid)
+      }
+
       const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', content: text }
       setMessages((m) => [...m, userMsg])
       const aId = `a-${Date.now()}`
@@ -98,7 +112,7 @@ export default function Chat() {
 
       await aiStream(
         '/ai/chat',
-        { sessionId, message: text, courseIds: citedCourseIds },
+        { sessionId: sid, message: text, courseIds: citedCourseIds },
         (delta) => setStreamingText((t) => t + delta),
         () => {
           setMessages((m) => [...m, { id: aId, role: 'assistant', content: '' }])
@@ -150,30 +164,43 @@ export default function Chat() {
     send.mutate(text)
   }
 
-  const newSession = async () => {
-    const s = await api<Session>('/chat/sessions', { method: 'POST', json: {} })
-    setSessionId(s.id)
+  /** 新对话：仅清空本地状态，等用户发第一句话再在后端建会话 */
+  const newSession = () => {
+    setSessionId(undefined)
     setMessages([])
-    setCitedCourseIds([])
-    qc.invalidateQueries({ queryKey: ['chat-sessions'] })
+    setCitedCourseIds(initialCourseId ? [initialCourseId] : [])
   }
 
   return (
     <div className="flex h-[100dvh] flex-col">
-      <header className="flex items-center justify-between border-b border-brand-100/60 bg-white/95 px-4 py-3 backdrop-blur">
-        <button onClick={() => setDrawerOpen(true)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card" aria-label="历史会话">
-          <History size={18} />
+      <header className="flex items-center justify-between gap-2 border-b border-brand-100/60 bg-white/95 px-3 py-3 backdrop-blur">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="历史会话"
+          className="relative inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white shadow-card transition active:scale-[0.97] hover:bg-brand-600"
+        >
+          <History size={15} strokeWidth={2.4} />
+          <span>历史</span>
+          {sessionsForBadge.length > 0 && (
+            <span className="ml-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold leading-none">
+              {sessionsForBadge.length}
+            </span>
+          )}
         </button>
-        <div className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-full bg-brand-50">
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-50">
             <Mascot size={28} mood="happy" />
           </div>
-          <div className="leading-tight">
-            <div className="text-sm font-bold">书院熊 · 学习陪伴</div>
+          <div className="min-w-0 leading-tight">
+            <div className="line-clamp-1 text-sm font-bold">书院熊 · 学习陪伴</div>
             <div className="text-[10px] text-ink-500">doubao-seed-2.0-pro 实时生成</div>
           </div>
         </div>
-        <button onClick={newSession} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card" aria-label="新对话">
+        <button
+          onClick={newSession}
+          aria-label="新对话"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-ink-700 shadow-card"
+        >
           <Plus size={18} />
         </button>
       </header>

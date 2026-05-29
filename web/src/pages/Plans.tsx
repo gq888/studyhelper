@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { motion } from 'framer-motion'
 import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { usePlan } from '@/hooks/usePlan'
 import { Mascot } from '@/components/Mascot'
@@ -126,11 +127,33 @@ export default function Plans() {
         )}
       </div>
 
-      {showAI && <AIGenerateSheet onClose={closeAll} onGenerate={(p) => { generateWithAI(p); closeAll() }} generating={generating} />}
+      {showAI && (
+        <AIGenerateSheet
+          onClose={closeAll}
+          onGenerate={(p) =>
+            generateWithAI(p, {
+              onSuccess: (created: any) => {
+                closeAll()
+                if (created?.id) nav(`/plans/${created.id}`)
+              },
+              onError: () => toast.error('生成失败，请稍后重试'),
+            })
+          }
+          generating={generating}
+        />
+      )}
       {showNew && <ManualCreateSheet onClose={closeAll} onCreate={(p) => { createPlan(p); closeAll() }} creating={creating} />}
     </div>
   )
 }
+
+const GENERATE_STEPS = [
+  '🔍 解析你的学习目标…',
+  '📚 检索引用的课程大纲…',
+  '🧠 规划每周节奏与重点…',
+  '📅 把任务排进日历…',
+  '✨ 整理输出 JSON…',
+]
 
 function AIGenerateSheet({
   onClose,
@@ -145,10 +168,35 @@ function AIGenerateSheet({
   const [weeks, setWeeks] = useState(2)
   const [weeklyHours, setWeeklyHours] = useState(6)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [progress, setProgress] = useState(0)
+  const [stepIdx, setStepIdx] = useState(0)
   const { data: mine = [] } = useQuery({
     queryKey: ['my-courses'],
     queryFn: () => api<MyCourse[]>('/courses?ownerOnly=true'),
   })
+
+  // 等待动画：generating 时推进进度（缓动到 92%，完成后由父组件 close 关闭）
+  useEffect(() => {
+    if (!generating) {
+      setProgress(0)
+      setStepIdx(0)
+      return
+    }
+    setProgress(6)
+    const tick = setInterval(() => {
+      setProgress((p) => {
+        const delta = Math.max(0.6, (92 - p) * 0.07)
+        return Math.min(p + delta, 92)
+      })
+    }, 250)
+    const stepRot = setInterval(() => {
+      setStepIdx((i) => (i + 1) % GENERATE_STEPS.length)
+    }, 1800)
+    return () => {
+      clearInterval(tick)
+      clearInterval(stepRot)
+    }
+  }, [generating])
 
   const toggle = (id: string) => {
     const next = new Set(selected)
@@ -158,64 +206,93 @@ function AIGenerateSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center"
+      onClick={generating ? undefined : onClose}
+    >
       <div className="w-full max-w-md rounded-t-3xl bg-white p-5 md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-        <div className="text-base font-bold">✨ AI 生成学习计划</div>
-        <p className="mt-1 text-xs text-ink-500">告诉书院熊你的目标，它会安排好每一天。</p>
-
-        <label className="mt-4 block text-sm font-semibold">学习目标</label>
-        <textarea
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-          placeholder="例：两周内入门 Python 并完成一个小项目"
-          className="input mt-1 h-20 resize-none"
-        />
-
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-          <label className="flex flex-col gap-1">
-            <span className="text-ink-500">持续周数</span>
-            <select className="input" value={weeks} onChange={(e) => setWeeks(Number(e.target.value))}>
-              {[1, 2, 3, 4, 6, 8, 12].map((n) => <option key={n} value={n}>{n} 周</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-ink-500">每周可用学时</span>
-            <select className="input" value={weeklyHours} onChange={(e) => setWeeklyHours(Number(e.target.value))}>
-              {[3, 5, 6, 8, 10, 14, 20].map((n) => <option key={n} value={n}>{n} 小时</option>)}
-            </select>
-          </label>
-        </div>
-
-        {mine.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-1 text-sm font-semibold">引用我的课程（可选）</div>
-            <div className="no-scrollbar flex max-h-32 flex-col gap-1.5 overflow-y-auto">
-              {mine.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => toggle(c.id)}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition ${
-                    selected.has(c.id) ? 'bg-brand-100 text-brand-700' : 'bg-brand-50/60 text-ink-700'
-                  }`}
-                >
-                  <span className="text-xs">{selected.has(c.id) ? '☑' : '☐'}</span>
-                  <span className="line-clamp-1 flex-1">{c.title}</span>
-                  <span className="text-[10px] text-ink-500">{c.estimatedHours.toFixed(1)}h</span>
-                </button>
-              ))}
+        {generating ? (
+          <div className="flex flex-col items-center py-2">
+            <Mascot size={108} mood="reading" bobbing />
+            <div className="mt-3 text-base font-bold">书院熊正在为你排期…</div>
+            <div className="mt-1 h-5 text-xs text-ink-500">
+              {GENERATE_STEPS[stepIdx]}
             </div>
+            <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-brand-100">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              />
+            </div>
+            <div className="mt-2 flex w-full items-center justify-between text-[11px] text-ink-500">
+              <span>doubao-seed-2.0-pro 实时生成</span>
+              <span className="tabular-nums">{Math.round(progress)}%</span>
+            </div>
+            <p className="mt-4 text-center text-[11px] text-ink-500">
+              此过程约 10-20 秒，完成后会自动打开计划详情。
+            </p>
           </div>
-        )}
+        ) : (
+          <>
+            <div className="text-base font-bold">✨ AI 生成学习计划</div>
+            <p className="mt-1 text-xs text-ink-500">告诉书院熊你的目标，它会安排好每一天。</p>
 
-        <button
-          disabled={!goal.trim() || generating}
-          onClick={() =>
-            onGenerate({ goal: goal.trim(), weeks, weeklyHours, courseIds: Array.from(selected) })
-          }
-          className="btn-primary mt-5 w-full"
-        >
-          {generating ? '生成中…（约 10s）' : (<><Sparkles size={16} /> 让 AI 排好</>)}
-        </button>
+            <label className="mt-4 block text-sm font-semibold">学习目标</label>
+            <textarea
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="例：两周内入门 Python 并完成一个小项目"
+              className="input mt-1 h-20 resize-none"
+            />
+
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <label className="flex flex-col gap-1">
+                <span className="text-ink-500">持续周数</span>
+                <select className="input" value={weeks} onChange={(e) => setWeeks(Number(e.target.value))}>
+                  {[1, 2, 3, 4, 6, 8, 12].map((n) => <option key={n} value={n}>{n} 周</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-ink-500">每周可用学时</span>
+                <select className="input" value={weeklyHours} onChange={(e) => setWeeklyHours(Number(e.target.value))}>
+                  {[3, 5, 6, 8, 10, 14, 20].map((n) => <option key={n} value={n}>{n} 小时</option>)}
+                </select>
+              </label>
+            </div>
+
+            {mine.length > 0 && (
+              <div className="mt-3">
+                <div className="mb-1 text-sm font-semibold">引用我的课程（可选）</div>
+                <div className="no-scrollbar flex max-h-32 flex-col gap-1.5 overflow-y-auto">
+                  {mine.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => toggle(c.id)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition ${
+                        selected.has(c.id) ? 'bg-brand-100 text-brand-700' : 'bg-brand-50/60 text-ink-700'
+                      }`}
+                    >
+                      <span className="text-xs">{selected.has(c.id) ? '☑' : '☐'}</span>
+                      <span className="line-clamp-1 flex-1">{c.title}</span>
+                      <span className="text-[10px] text-ink-500">{c.estimatedHours.toFixed(1)}h</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              disabled={!goal.trim()}
+              onClick={() =>
+                onGenerate({ goal: goal.trim(), weeks, weeklyHours, courseIds: Array.from(selected) })
+              }
+              className="btn-primary mt-5 w-full"
+            >
+              <Sparkles size={16} /> 让 AI 排好
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

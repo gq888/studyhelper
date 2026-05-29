@@ -8,6 +8,7 @@ interface Session {
   title: string
   courseId?: string | null
   updatedAt: string
+  messageCount?: number
 }
 
 interface Props {
@@ -66,8 +67,11 @@ export function ChatSessionsDrawer({ open, onClose, currentId, onSelect, onNew }
                   <div className={`line-clamp-1 text-sm font-medium ${active ? 'text-brand-700' : 'text-ink-900'}`}>
                     {s.title}
                   </div>
-                  <div className="mt-0.5 text-[10px] text-ink-500">
-                    {new Date(s.updatedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-500">
+                    <span>{new Date(s.updatedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    {typeof s.messageCount === 'number' && s.messageCount > 0 && (
+                      <span>· {s.messageCount} 条</span>
+                    )}
                   </div>
                 </button>
                 <button

@@ -8,7 +8,7 @@ import { PomoTimer } from '@/components/Timer'
 import { ChatSessionsDrawer } from '@/components/ChatSessionsDrawer'
 import { CoursePicker } from '@/components/CoursePicker'
 import { PlanPicker } from '@/components/PlanPicker'
-import { PlanProposalCard, extractPlanProposal } from '@/components/PlanProposalCard'
+import { PlanProposalCard } from '@/components/PlanProposalCard'
 import { api, aiStream } from '@/api/client'
 
 interface Message {
@@ -38,18 +38,6 @@ const SUGGESTIONS = [
   '休息 5 分钟，提醒我回来',
 ]
 
-function extractTimer(content: string): { mins: number; label?: string; clean: string } | null {
-  const m = content.match(/<<TIMER:(\d+)(?::([^>]+))?>>/)
-  if (!m) return null
-  return { mins: Number(m[1]), label: m[2], clean: content.replace(m[0], '').trim() }
-}
-
-function extractTaskDone(content: string): { itemId: string; clean: string } | null {
-  const m = content.match(/<<TASK_DONE:([^>]+)>>/)
-  if (!m) return null
-  return { itemId: m[1].trim(), clean: content.replace(m[0], '').trim() }
-}
-
 function parseKV(raw: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const piece of raw.split('|')) {
@@ -60,23 +48,77 @@ function parseKV(raw: string): Record<string, string> {
   return out
 }
 
-function extractTaskReview(content: string): {
-  title: string
-  minutes: number
-  date: string
-  courseId?: string
-  clean: string
-} | null {
-  const m = content.match(/<<TASK_REVIEW:([^>]+)>>/)
-  if (!m) return null
-  const p = parseKV(m[1])
-  return {
-    title: p.title || '复习任务',
-    minutes: Math.max(5, Math.min(180, parseInt(p.minutes || '25', 10) || 25)),
-    date: p.date || new Date(Date.now() + 86400_000).toISOString().slice(0, 10),
-    courseId: p.courseId || undefined,
-    clean: content.replace(m[0], '').trim(),
+const TOMORROW_ISO = () => new Date(Date.now() + 86400_000).toISOString().slice(0, 10)
+
+/** AI 回复里识别到的所有特殊标记。同一类型可以并存（如两个番茄钟） */
+type AssistantTag =
+  | { kind: 'timer'; key: string; mins: number; label?: string }
+  | {
+      kind: 'plan'
+      key: string
+      goal: string
+      weeks: number
+      hours: number
+      courseIds: string[]
+    }
+  | { kind: 'task_done'; key: string; itemId: string }
+  | {
+      kind: 'task_review'
+      key: string
+      title: string
+      minutes: number
+      date: string
+      courseId?: string
+    }
+
+/** 一次性提取消息里所有标记，并返回剥离所有标记后的纯文本 */
+function extractAllTags(content: string): { tags: AssistantTag[]; clean: string } {
+  const tags: AssistantTag[] = []
+  let clean = content
+
+  let idx = 0
+  for (const m of content.matchAll(/<<TIMER:(\d+)(?::([^>]+))?>>/g)) {
+    tags.push({ kind: 'timer', key: `t-${idx++}`, mins: Number(m[1]), label: m[2] })
   }
+
+  for (const m of content.matchAll(/<<PLAN:([^>]+)>>/g)) {
+    const p = parseKV(m[1])
+    tags.push({
+      kind: 'plan',
+      key: `p-${idx++}`,
+      goal: p.goal || '我的学习计划',
+      weeks: Math.max(1, Math.min(26, parseInt(p.weeks || '4', 10) || 4)),
+      hours: Math.max(1, Math.min(40, parseInt(p.hours || '6', 10) || 6)),
+      courseIds: (p.courseIds || '').split(',').map((s) => s.trim()).filter(Boolean),
+    })
+  }
+
+  for (const m of content.matchAll(/<<TASK_DONE:([^>]+)>>/g)) {
+    tags.push({ kind: 'task_done', key: `d-${idx++}`, itemId: m[1].trim() })
+  }
+
+  for (const m of content.matchAll(/<<TASK_REVIEW:([^>]+)>>/g)) {
+    const p = parseKV(m[1])
+    tags.push({
+      kind: 'task_review',
+      key: `r-${idx++}`,
+      title: p.title || '复习任务',
+      minutes: Math.max(5, Math.min(180, parseInt(p.minutes || '25', 10) || 25)),
+      date: p.date || TOMORROW_ISO(),
+      courseId: p.courseId || undefined,
+    })
+  }
+
+  // 一次性剥离所有标记
+  clean = clean
+    .replace(/<<TIMER:[^>]+>>/g, '')
+    .replace(/<<PLAN:[^>]+>>/g, '')
+    .replace(/<<TASK_DONE:[^>]+>>/g, '')
+    .replace(/<<TASK_REVIEW:[^>]+>>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  return { tags, clean }
 }
 
 export default function Chat() {
@@ -111,6 +153,8 @@ export default function Chat() {
   const [citedPlanId, setCitedPlanId] = useState<string | undefined>(initialPlanId)
   const streamTextRef = useRef('')
   const processedMessageIds = useRef<Set<string>>(new Set())
+  /** 从服务端 /chat/sessions/:id 拉来的历史消息 id 集合：里面的番茄钟不自动开始、计划草稿仅作快照展示 */
+  const historicalIdsRef = useRef<Set<string>>(new Set())
   const autoSentRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -137,9 +181,16 @@ export default function Chat() {
   useEffect(() => {
     if (!sessionId) {
       setMessages([])
+      historicalIdsRef.current = new Set()
       return
     }
-    api<{ messages: Message[] }>(`/chat/sessions/${sessionId}`).then((s) => setMessages(s.messages || [])).catch(() => null)
+    api<{ messages: Message[] }>(`/chat/sessions/${sessionId}`)
+      .then((s) => {
+        const msgs = s.messages || []
+        historicalIdsRef.current = new Set(msgs.map((m) => m.id))
+        setMessages(msgs)
+      })
+      .catch(() => null)
   }, [sessionId])
 
   // 从课程详情页或学习计划答疑跳过来时自动引用对应课程
@@ -170,48 +221,51 @@ export default function Chat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, streamingText])
 
-  /** 处理 AI 输出末尾的特殊标记并落库 */
+  /** 处理 AI 输出末尾的所有特殊标记并落库（同一条消息内可含多个 TASK_REVIEW 等） */
   const processAssistantTags = async (mid: string, content: string) => {
     if (processedMessageIds.current.has(mid)) return
+    if (historicalIdsRef.current.has(mid)) return // 历史消息不重新触发副作用
     processedMessageIds.current.add(mid)
-    if (!citedPlanId) return // 没有引用计划就别理任务相关标记
+    if (!citedPlanId) return
 
-    const done = extractTaskDone(content)
-    if (done) {
+    const { tags } = extractAllTags(content)
+    const doneIds = tags.filter((t) => t.kind === 'task_done').map((t) => (t as any).itemId as string)
+    const reviews = tags.filter((t) => t.kind === 'task_review') as Extract<AssistantTag, { kind: 'task_review' }>[]
+
+    let touched = false
+    for (const itemId of doneIds) {
       try {
-        await api(`/plans/${citedPlanId}/items/${done.itemId}`, {
+        await api(`/plans/${citedPlanId}/items/${itemId}`, {
           method: 'PATCH',
           json: { done: true },
         })
-        toast.success('任务已标记为已掌握 ✓')
-        qc.invalidateQueries({ queryKey: ['plan', citedPlanId] })
-        qc.invalidateQueries({ queryKey: ['cited-plan', citedPlanId] })
-        qc.invalidateQueries({ queryKey: ['plans'] })
-        qc.invalidateQueries({ queryKey: ['heatmap'] })
-        qc.invalidateQueries({ queryKey: ['me'] })
-      } catch {
-        // 静默：可能该 itemId 不属于此 plan
-      }
+        touched = true
+      } catch {}
     }
-
-    const review = extractTaskReview(content)
-    if (review) {
+    for (const r of reviews) {
       try {
         await api(`/plans/${citedPlanId}/items`, {
           method: 'POST',
           json: {
-            date: review.date,
-            title: review.title,
-            minutes: review.minutes,
-            courseId: review.courseId,
+            date: r.date,
+            title: r.title,
+            minutes: r.minutes,
+            courseId: r.courseId,
             note: '由书院熊根据考核结果添加的复习任务',
           },
         })
-        toast.success('已加入复习任务 📝')
-        qc.invalidateQueries({ queryKey: ['plan', citedPlanId] })
-        qc.invalidateQueries({ queryKey: ['cited-plan', citedPlanId] })
-        qc.invalidateQueries({ queryKey: ['plans'] })
+        touched = true
       } catch {}
+    }
+
+    if (touched) {
+      if (doneIds.length) toast.success(`已掌握 ${doneIds.length} 个任务 ✓`)
+      if (reviews.length) toast.success(`已加入 ${reviews.length} 个复习任务 📝`)
+      qc.invalidateQueries({ queryKey: ['plan', citedPlanId] })
+      qc.invalidateQueries({ queryKey: ['cited-plan', citedPlanId] })
+      qc.invalidateQueries({ queryKey: ['plans'] })
+      qc.invalidateQueries({ queryKey: ['heatmap'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
     }
   }
 
@@ -395,17 +449,10 @@ export default function Chat() {
 
           {messages.map((m) => {
             const isUser = m.role === 'user'
-            // 多种标记可能同时出现，逐个剥离
-            let body = m.content
-            const timer = !isUser ? extractTimer(body) : null
-            if (timer) body = timer.clean
-            const planProposal = !isUser ? extractPlanProposal(body) : null
-            if (planProposal) body = planProposal.clean
-            const taskDone = !isUser ? extractTaskDone(body) : null
-            if (taskDone) body = taskDone.clean
-            const taskReview = !isUser ? extractTaskReview(body) : null
-            if (taskReview) body = taskReview.clean
-            const text = body
+            const { tags, clean } = !isUser
+              ? extractAllTags(m.content)
+              : { tags: [] as AssistantTag[], clean: m.content }
+            const isHistorical = historicalIdsRef.current.has(m.id)
             return (
               <div key={m.id} className={`mb-3 flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                 {!isUser && (
@@ -414,35 +461,67 @@ export default function Chat() {
                   </div>
                 )}
                 <div className={`max-w-[78%] space-y-2 ${isUser ? 'items-end' : ''}`}>
-                  {text && (
+                  {clean && (
                     <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-card ${isUser ? 'bg-brand-500 text-white' : 'bg-white text-ink-900'}`}>
-                      {text}
+                      {clean}
                     </div>
                   )}
-                  {!text && m.id === streamingId && (
+                  {!clean && m.id === streamingId && (
                     <div className="rounded-2xl bg-white px-3.5 py-2.5 text-sm shadow-card">...</div>
                   )}
-                  {timer && <PomoTimer minutes={timer.mins} label={timer.label} />}
-                  {planProposal && (
-                    <PlanProposalCard
-                      proposal={planProposal}
-                      onCreated={(p) => setCitedPlanId(p.id)}
-                    />
-                  )}
-                  {taskDone && (
-                    <div className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-card">
-                      ✅ 已掌握，自动标记完成
-                    </div>
-                  )}
-                  {taskReview && (
-                    <div className="space-y-1 rounded-2xl bg-purple-50 px-3 py-2 text-xs text-purple-700 shadow-card">
-                      <div className="font-semibold">📝 已加复习任务</div>
-                      <div className="text-ink-700">{taskReview.title}</div>
-                      <div className="text-[10px] text-ink-500">
-                        {taskReview.date} · {taskReview.minutes} 分钟
-                      </div>
-                    </div>
-                  )}
+                  {tags.map((tag) => {
+                    if (tag.kind === 'timer') {
+                      return (
+                        <PomoTimer
+                          key={tag.key}
+                          minutes={tag.mins}
+                          label={tag.label}
+                          autoStart={!isHistorical}
+                        />
+                      )
+                    }
+                    if (tag.kind === 'plan') {
+                      return (
+                        <PlanProposalCard
+                          key={tag.key}
+                          proposal={{
+                            goal: tag.goal,
+                            weeks: tag.weeks,
+                            hours: tag.hours,
+                            courseIds: tag.courseIds,
+                            clean,
+                          }}
+                          onCreated={(p) => setCitedPlanId(p.id)}
+                          historical={isHistorical}
+                        />
+                      )
+                    }
+                    if (tag.kind === 'task_done') {
+                      return (
+                        <div
+                          key={tag.key}
+                          className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-card"
+                        >
+                          ✅ 已掌握{isHistorical ? '（历史记录）' : '，自动标记完成'}
+                        </div>
+                      )
+                    }
+                    if (tag.kind === 'task_review') {
+                      return (
+                        <div
+                          key={tag.key}
+                          className="space-y-1 rounded-2xl bg-purple-50 px-3 py-2 text-xs text-purple-700 shadow-card"
+                        >
+                          <div className="font-semibold">📝 已加复习任务{isHistorical ? '（历史记录）' : ''}</div>
+                          <div className="text-ink-700">{tag.title}</div>
+                          <div className="text-[10px] text-ink-500">
+                            {tag.date} · {tag.minutes} 分钟
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })}
                 </div>
               </div>
             )

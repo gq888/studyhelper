@@ -22,3 +22,16 @@ web/dist/
 
 # TS 增量构建缓存
 *.tsbuildinfo
+
+# Android 构建产物
+web/android/.gradle/
+web/android/.idea/
+web/android/build/
+web/android/app/build/
+web/android/local.properties
+web/android/app/release/
+*.apk
+*.aab
+*.jks
+*.keystore
+release-signing.properties

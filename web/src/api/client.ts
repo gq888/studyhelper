@@ -1,6 +1,12 @@
 import { useAuth } from '@/store/auth'
 
-const BASE = '/api'
+/**
+ * API 基址：
+ * - Web 开发：通过 vite proxy 走 /api 同源
+ * - Web 生产 (Caddy 同源)：仍走 /api
+ * - 原生 Android（Capacitor）：必须设置 VITE_API_BASE 为 https://yourdomain.com/api
+ */
+const BASE = import.meta.env.VITE_API_BASE || '/api'
 
 class ApiError extends Error {
   status: number

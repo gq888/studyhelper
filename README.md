@@ -104,6 +104,22 @@ docker compose up -d --build
 
 服务会暴露在 `https://yourdomain` 上（Caddy 自动签证书）。后端 API 走 `/api/*` 反代到容器 :8787。
 
+## 📲 打包成原生 Android APK
+
+已通过 **Capacitor 6** 接入原生 Android 工程（位于 `web/android/`）。
+
+```bash
+cd web
+npm run build && npx cap sync android   # 同步 dist 进 android 工程
+npm run android:open                    # 用 Android Studio 打开调试
+# 或直接：
+cd android && ./gradlew assembleDebug   # 产出 app-debug.apk
+```
+
+**重要**：APK 不再同源，必须在 `web/.env.production` 配 `VITE_API_BASE=https://api.yourdomain.com/api`，并把后端 `CORS_ORIGIN` 加上 `https://localhost,capacitor://localhost`。
+
+完整步骤（含签名 + 上架）见 [docs/android.md](docs/android.md)。
+
 ## 📱 PWA & 跨平台适配
 
 - 在手机浏览器打开网页，添加到主屏即可作为 App 使用

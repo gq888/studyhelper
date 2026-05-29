@@ -38,6 +38,8 @@ export function extractPlanProposal(content: string): PlanProposal | null {
 
 interface Props {
   proposal: PlanProposal
+  /** 生成成功后回调（默认仅 setCitedPlanId 用，不再自动跳转） */
+  onCreated?: (plan: { id: string; title: string }) => void
 }
 
 const STEPS = [
@@ -48,13 +50,14 @@ const STEPS = [
   '✨ 整理输出 JSON…',
 ]
 
-export function PlanProposalCard({ proposal }: Props) {
+export function PlanProposalCard({ proposal, onCreated }: Props) {
   const nav = useNavigate()
   const { generateWithAI, generating } = usePlan()
   const [progress, setProgress] = useState(0)
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  const [createdPlan, setCreatedPlan] = useState<{ id: string; title: string } | null>(null)
 
   // 缓动进度条
   if (generating && !busy) setBusy(true)
@@ -80,7 +83,11 @@ export function PlanProposalCard({ proposal }: Props) {
           clearInterval(rot)
           setProgress(100)
           setDone(true)
-          if (p?.id) setTimeout(() => nav(`/plans/${p.id}`), 600)
+          if (p?.id) {
+            const created = { id: p.id, title: p.title ?? proposal.goal }
+            setCreatedPlan(created)
+            onCreated?.(created)
+          }
         },
         onError: () => {
           clearInterval(tick)
@@ -92,14 +99,14 @@ export function PlanProposalCard({ proposal }: Props) {
     )
   }
 
-  if (busy) {
+  if (busy && !done) {
     return (
       <div className="space-y-2 rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-3 shadow-card">
         <div className="flex items-center gap-2 text-sm font-bold text-brand-700">
           <Sparkles size={15} className="animate-pulse" />
-          {done ? '计划已生成 🎉' : '书院熊正在排期…'}
+          书院熊正在排期…
         </div>
-        <div className="h-[18px] text-[11px] text-ink-500">{done ? '即将跳转详情…' : STEPS[step]}</div>
+        <div className="h-[18px] text-[11px] text-ink-500">{STEPS[step]}</div>
         <div className="h-2 overflow-hidden rounded-full bg-brand-100">
           <motion.div
             className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
@@ -108,6 +115,27 @@ export function PlanProposalCard({ proposal }: Props) {
           />
         </div>
         <div className="text-right text-[10px] tabular-nums text-ink-500">{Math.round(progress)}%</div>
+      </div>
+    )
+  }
+
+  // 生成完成后的状态：自动引用 + 提供「查看详情」入口
+  if (done && createdPlan) {
+    return (
+      <div className="space-y-2 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-card">
+        <div className="flex items-center gap-2 text-sm font-bold text-emerald-700">
+          ✅ 计划已生成并自动引用
+        </div>
+        <div className="line-clamp-2 text-xs text-ink-700">《{createdPlan.title}》</div>
+        <p className="text-[11px] text-ink-500">
+          接下来问书院熊关于这个计划的任何问题，它都拿得到完整任务清单。
+        </p>
+        <button
+          onClick={() => nav(`/plans/${createdPlan.id}`)}
+          className="w-full rounded-2xl bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-card"
+        >
+          查看计划详情 →
+        </button>
       </div>
     )
   }

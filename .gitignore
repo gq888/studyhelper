@@ -35,3 +35,7 @@ web/android/app/release/
 *.jks
 *.keystore
 release-signing.properties
+
+# Coze 工作流源码归档的本地虚拟环境
+projects/.venv/
+projects/uv.lock

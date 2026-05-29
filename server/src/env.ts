@@ -29,4 +29,8 @@ export const env = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN ?? '30d',
 
   DATABASE_URL: process.env.DATABASE_URL ?? 'file:./prisma/dev.db',
+
+  // Coze 视频字幕解析
+  COZE_BASE_URL: process.env.COZE_BASE_URL ?? '',
+  COZE_API_TOKEN: process.env.COZE_API_TOKEN ?? '',
 }

@@ -19,3 +19,6 @@ server/prisma/dev.db-journal
 
 web/dist/
 .vite/
+
+# TS 增量构建缓存
+*.tsbuildinfo

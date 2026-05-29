@@ -1,0 +1,12 @@
+# 部署到你的域名时，把 example.com 替换为真实域名
+example.com {
+  encode gzip zstd
+  handle /api/* {
+    reverse_proxy app:8787
+  }
+  handle {
+    root * /srv/web
+    try_files {path} /index.html
+    file_server
+  }
+}

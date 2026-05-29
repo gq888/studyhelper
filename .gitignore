@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+
+# 含密钥，禁止入库；提交 .env.example 作为模板
+.env
+.env.local
+server/.env
+
+# 本地 SQLite 数据
+server/data/
+server/prisma/dev.db
+server/prisma/dev.db-journal
+
+# 大文件（参考视频）
+*.mp4
+
+web/dist/
+.vite/

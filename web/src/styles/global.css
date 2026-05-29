@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-top: env(safe-area-inset-top);
+}
+
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: theme('fontFamily.round');
+  color: theme('colors.ink.900');
+  background: theme('colors.paper');
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+@layer components {
+  .container-app {
+    @apply mx-auto w-full max-w-[480px] md:max-w-[640px] lg:max-w-3xl xl:max-w-4xl px-4;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-2xl bg-brand-500 px-5 py-3 text-base font-semibold text-white shadow-card transition-all active:scale-[0.98] hover:bg-brand-600 disabled:opacity-50 disabled:hover:bg-brand-500;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-2xl bg-brand-50 px-5 py-3 text-base font-semibold text-brand-700 transition-all active:scale-[0.98] hover:bg-brand-100;
+  }
+  .card {
+    @apply rounded-3xl bg-white shadow-card;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700;
+  }
+  .input {
+    @apply w-full rounded-2xl border border-brand-100 bg-white px-4 py-3 text-base outline-none transition focus:border-brand-400 focus:shadow-ring;
+  }
+}
+
+/* 隐藏滚动条但可滚动 */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

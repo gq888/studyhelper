@@ -1,0 +1,20 @@
+{
+  "name": "studyhelper-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "学海小书院 - AI 驱动的学习课程助手（仿随厨小食堂，主题改为学习课程）",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev -w server\" \"npm:dev -w web\"",
+    "build": "npm run build -w server && npm run build -w web",
+    "start": "npm run start -w server",
+    "db:push": "npm run db:push -w server",
+    "db:seed": "npm run db:seed -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

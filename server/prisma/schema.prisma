@@ -1,0 +1,189 @@
+// 学海小书院 - 数据模型
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  passwordHash String
+  nickname    String
+  avatar      String?
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courses      Course[]
+  checkIns     CheckIn[]
+  ratings      Rating[]
+  favorites    Favorite[]
+  chatSessions ChatSession[]
+  achievements UserAchievement[]
+  orders       Order[]
+}
+
+// 学习课程（由用户从视频链接生成，或由系统推荐）
+model Course {
+  id             String   @id @default(cuid())
+  title          String
+  subtitle       String?
+  cover          String?
+  sourceUrl      String?
+  difficulty     Int      @default(3) // 1-5
+  estimatedHours Float    @default(1.0)
+  category       String   @default("general")
+  tags           String   @default("[]") // JSON 数组
+  // AI 提取的结构化大纲（JSON）
+  objectives     String   @default("[]") // 学习目标
+  prerequisites  String   @default("[]") // 前置知识
+  outline        String   @default("[]") // 章节大纲 [{ title, duration, points: [], tips: [] }]
+  resources      String   @default("[]") // 推荐资料
+  ownerId        String?
+  isPublic       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner     User?       @relation(fields: [ownerId], references: [id])
+  ratings   Rating[]
+  favorites Favorite[]
+}
+
+// 真实打卡（每日/每课程）
+model CheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  // UTC+8 日期 yyyy-MM-dd
+  date      String
+  courseId  String?
+  minutes   Int      @default(25)
+  note      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date, courseId])
+  @@index([userId, date])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  stars     Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String?
+  title     String   @default("新对话")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id])
+  messages ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String   // user / assistant / system / tool
+  content   String
+  meta      String?  // JSON：定时器、引用等
+  createdAt DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  code        String   @unique // first_course, streak_7, streak_30, ...
+  title       String
+  description String
+  icon        String
+  rarity      String   @default("common")
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+// 商品（书、课程、文具周边）
+model Product {
+  id          String   @id @default(cuid())
+  title       String
+  cover       String
+  description String
+  price       Int      // 分
+  originalPrice Int?
+  stock       Int      @default(99)
+  category    String   @default("book") // book / course / merch
+  tags        String   @default("[]")
+  rating      Float    @default(4.8)
+  sold        Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  userId    String
+  totalCents Int
+  status    String   @default("pending") // pending / paid / shipped / done / cancelled
+  payMethod String?
+  payTxnId  String?
+  address   String?
+  createdAt DateTime @default(now())
+  paidAt    DateTime?
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int     @default(1)
+  priceCents Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}

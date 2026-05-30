@@ -52,6 +52,7 @@ jobs:
         run: |
           cd web/android
           chmod +x gradlew
+          ./gradlew clean --no-daemon
           ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK

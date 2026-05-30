@@ -50,6 +50,7 @@ console.warn = (...args) => {
 
 export default function Debug() {
   const [, forceUpdate] = useState(0)
+  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => forceUpdate(n => n + 1), 500)
@@ -101,13 +102,20 @@ export default function Debug() {
 
       <h1 className="text-xl font-bold mb-4">🔍 调试日志</h1>
 
-      {filteredLogs.length === 0 ? (
+      <div className="mb-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!showAll} onChange={(e) => setShowAll(!e.target.checked)} />
+          只显示相关日志（过滤）
+        </label>
+      </div>
+
+      {(showAll ? logs : filteredLogs).length === 0 ? (
         <div className="text-gray-500 text-center py-8">
           暂无相关日志，请尝试使用通知功能
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredLogs.slice().reverse().map(log => (
+          {(showAll ? logs : filteredLogs).slice().reverse().map(log => (
             <div
               key={log.id}
               className={`p-3 rounded border ${

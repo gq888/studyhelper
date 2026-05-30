@@ -99,7 +99,10 @@ async function maybeNotify(task: BgTask, title: string, body: string) {
 
 /** 用户在不确定环境（可能浏览器 / 可能 native）下点击「完成时提醒我」时调用 */
 export async function ensureNotificationPermission(): Promise<boolean> {
+  console.log('[ensureNotificationPermission] 开始检查通知权限...')
   const r = await requestNotificationPermission()
+  console.log('[ensureNotificationPermission] requestNotificationPermission 返回:', r)
+  console.log('[ensureNotificationPermission] 是否 granted:', r === 'granted')
   return r === 'granted'
 }
 

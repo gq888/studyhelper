@@ -6,12 +6,14 @@ interface HeatmapDay {
 interface HeatmapProps {
   days: HeatmapDay[]
   cellSize?: number
+  /** 点击单元格时回调（传 null 表示空格） */
+  onSelectDay?: (day: HeatmapDay | null) => void
 }
 
 /**
  * GitHub 风格的热力图，按周排列。最右一列为今天。
  */
-export function Heatmap({ days, cellSize = 12 }: HeatmapProps) {
+export function Heatmap({ days, cellSize = 12, onSelectDay }: HeatmapProps) {
   if (!days.length) return null
   // 把第一个日期对齐到周日（按 ISO，0=周日）。
   const first = new Date(days[0].date)
@@ -66,18 +68,34 @@ export function Heatmap({ days, cellSize = 12 }: HeatmapProps) {
           <div className="flex flex-col gap-0.5">
             {matrix.map((row, r) => (
               <div key={r} className="flex gap-0.5">
-                {row.map((d, c) => (
-                  <div
-                    key={c}
-                    title={d ? `${d.date} · ${d.minutes} 分钟` : ''}
-                    style={{
-                      width: cellSize,
-                      height: cellSize,
-                      background: d ? colorFor(d.minutes) : 'transparent',
-                      borderRadius: 3,
-                    }}
-                  />
-                ))}
+                {row.map((d, c) => {
+                  const cellStyle = {
+                    width: cellSize,
+                    height: cellSize,
+                    background: d ? colorFor(d.minutes) : 'transparent',
+                    borderRadius: 3,
+                  } as const
+                  if (d && onSelectDay) {
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => onSelectDay(d)}
+                        title={`${d.date} · ${d.minutes} 分钟`}
+                        aria-label={`${d.date} 学习 ${d.minutes} 分钟`}
+                        style={{ ...cellStyle, padding: 0, border: 'none', cursor: 'pointer' }}
+                        className="transition active:scale-90"
+                      />
+                    )
+                  }
+                  return (
+                    <div
+                      key={c}
+                      title={d ? `${d.date} · ${d.minutes} 分钟` : ''}
+                      style={cellStyle}
+                    />
+                  )
+                })}
               </div>
             ))}
           </div>

@@ -25,10 +25,30 @@ export async function ratingRoutes(app: FastifyInstance) {
   })
 
   app.get('/ratings/me', { preHandler: requireAuth }, async (req) => {
-    return prisma.rating.findMany({
+    const list = await prisma.rating.findMany({
       where: { userId: req.userId! },
       orderBy: { createdAt: 'desc' },
       include: { course: true },
     })
+    return list.map((r) => ({ ...r, course: serialize(r.course) }))
   })
+}
+
+function serialize(c: any) {
+  if (!c) return c
+  const parse = (s: string, fb: any) => {
+    try {
+      return JSON.parse(s)
+    } catch {
+      return fb
+    }
+  }
+  return {
+    ...c,
+    tags: parse(c.tags ?? '[]', []),
+    objectives: parse(c.objectives ?? '[]', []),
+    prerequisites: parse(c.prerequisites ?? '[]', []),
+    outline: parse(c.outline ?? '[]', []),
+    resources: parse(c.resources ?? '[]', []),
+  }
 }

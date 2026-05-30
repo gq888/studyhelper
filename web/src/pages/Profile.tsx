@@ -1,3 +1,4 @@
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -17,6 +18,11 @@ import { api } from '@/api/client'
 import { useAuth } from '@/store/auth'
 import { Mascot } from '@/components/Mascot'
 import { Heatmap } from '@/components/Heatmap'
+import {
+  AchievementSheet,
+  type AchievementDef,
+  type AchievementProgress,
+} from '@/components/AchievementSheet'
 
 interface MeData {
   id: string
@@ -27,16 +33,61 @@ interface MeData {
   stats: { achievements: number; favorites: number; learned: number; streak: number }
 }
 
-const ACHIEVEMENTS = [
-  { code: 'first_course', title: '初入书院', icon: '🎓', desc: '保存第一门课程' },
+const ACHIEVEMENTS: AchievementDef[] = [
+  { code: 'first_course', title: '初入书院', icon: '🎓', desc: '收藏你的第一门课程' },
   { code: 'streak_3', title: '小有恒心', icon: '🔥', desc: '连续打卡 3 天' },
   { code: 'streak_7', title: '一周坚持', icon: '🌟', desc: '连续打卡 7 天' },
   { code: 'streak_30', title: '月度大师', icon: '🏆', desc: '连续打卡 30 天' },
-  { code: 'study_5h', title: '专注力+', icon: '⏳', desc: '累计 5 小时' },
-  { code: 'rate_10', title: '善于反思', icon: '⭐', desc: '点评 10 门' },
-  { code: 'fav_20', title: '收藏家', icon: '📚', desc: '收藏 20 门' },
-  { code: 'all_subjects', title: '通识达人', icon: '🌈', desc: '跨 5 学科' },
+  { code: 'study_5h', title: '专注力+', icon: '⏳', desc: '累计学习 5 小时' },
+  { code: 'rate_10', title: '善于反思', icon: '⭐', desc: '点评 10 门课程' },
+  { code: 'fav_20', title: '收藏家', icon: '📚', desc: '收藏 20 门课程' },
+  { code: 'all_subjects', title: '通识达人', icon: '🌈', desc: '学习覆盖 5 个学科' },
 ]
+
+/** 从已有 stats / 热力图分钟数推导每个成就的进度 */
+function getProgress(
+  code: string,
+  stats: { favorites: number; learned: number; streak: number },
+  totalMinutes: number,
+): AchievementProgress {
+  switch (code) {
+    case 'first_course':
+      // 收藏第一门课程即解锁（与解析结果页的「❤ 收藏」按钮统计一致）
+      return { current: Math.min(stats.favorites, 1), target: 1 }
+    case 'streak_3':
+      return { current: Math.min(stats.streak, 3), target: 3, unit: ' 天' }
+    case 'streak_7':
+      return { current: Math.min(stats.streak, 7), target: 7, unit: ' 天' }
+    case 'streak_30':
+      return { current: Math.min(stats.streak, 30), target: 30, unit: ' 天' }
+    case 'study_5h':
+      return {
+        current: Math.min(totalMinutes, 300),
+        target: 300,
+        unit: ' 分钟',
+      }
+    case 'rate_10':
+      return { current: Math.min(stats.learned, 10), target: 10 }
+    case 'fav_20':
+      return { current: Math.min(stats.favorites, 20), target: 20 }
+    case 'all_subjects':
+      // 暂未在 /me 暴露 distinct categories，先标记为待统计
+      return { current: 0, target: 5, unknown: true }
+    default:
+      return { current: 0, target: 1 }
+  }
+}
+
+/** 下一个 streak 里程碑 */
+function nextStreakMilestone(streak: number): { target: number; title: string } | null {
+  const stops = [
+    { target: 3, title: '小有恒心' },
+    { target: 7, title: '一周坚持' },
+    { target: 30, title: '月度大师' },
+    { target: 100, title: '百日筑基' },
+  ]
+  return stops.find((s) => streak < s.target) ?? null
+}
 
 export default function Profile() {
   const nav = useNavigate()
@@ -58,6 +109,67 @@ export default function Profile() {
         ? toast('今天已经打过卡啦 ✨')
         : toast.error('打卡失败'),
   })
+
+  // 弹窗：当前查看的成就
+  const [openedAchievement, setOpenedAchievement] = useState<AchievementDef | null>(null)
+
+  // 成就区锚点，用于「奖章」统计跳转
+  const achievementsRef = useRef<HTMLElement | null>(null)
+
+  const totalMinutes = useMemo(
+    () => heatmap.reduce((sum, d) => sum + (d.minutes ?? 0), 0),
+    [heatmap],
+  )
+
+  const statsForProgress = {
+    favorites: me?.stats.favorites ?? 0,
+    learned: me?.stats.learned ?? 0,
+    streak: me?.stats.streak ?? 0,
+  }
+
+  // 顶部三个统计的点击行为
+  const headerStats: { n: number; l: string; onClick: () => void }[] = [
+    {
+      n: me?.stats.achievements ?? 0,
+      l: '我的奖章',
+      onClick: () =>
+        achievementsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    },
+    {
+      n: me?.stats.favorites ?? 0,
+      l: '我的收藏',
+      onClick: () => nav('/library?tab=fav'),
+    },
+    {
+      n: me?.stats.learned ?? 0,
+      l: '我已学习',
+      onClick: () => nav('/library?tab=learned'),
+    },
+  ]
+
+  // 「连续 X 天」点击 → 下一个里程碑提示
+  const onStreakTap = () => {
+    const streak = me?.stats.streak ?? 0
+    const ms = nextStreakMilestone(streak)
+    if (!ms) {
+      toast.success(`已连续 ${streak} 天，超神级 🌟`)
+      return
+    }
+    toast(
+      `已连续 ${streak} 天，距离「${ms.title}」(${ms.target} 天) 还差 ${ms.target - streak} 天 💪`,
+      { duration: 3000 },
+    )
+  }
+
+  // 热力图格子点击
+  const onHeatmapTap = (d: { date: string; minutes: number } | null) => {
+    if (!d) return
+    if (d.minutes <= 0) {
+      toast(`${d.date} · 这天没有学习记录`)
+    } else {
+      toast.success(`${d.date} · 学习 ${d.minutes} 分钟`)
+    }
+  }
 
   return (
     <div className="container-app pb-10">
@@ -85,15 +197,16 @@ export default function Profile() {
             </button>
           </div>
           <div className="mt-5 grid grid-cols-3 text-center">
-            {[
-              { n: me?.stats.achievements ?? 0, l: '我的奖章' },
-              { n: me?.stats.favorites ?? 0, l: '我的收藏' },
-              { n: me?.stats.learned ?? 0, l: '我已学习' },
-            ].map((x, i) => (
-              <div key={i}>
+            {headerStats.map((x, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={x.onClick}
+                className="rounded-2xl py-1 transition active:scale-[0.97] hover:bg-white/10"
+              >
                 <div className="text-2xl font-extrabold">{x.n}</div>
                 <div className="text-[11px] opacity-90">{x.l}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -110,32 +223,54 @@ export default function Profile() {
             <div className="text-[11px] text-ink-500">记录今天学了 25 分钟</div>
           </div>
         </button>
-        <div className="card flex items-center gap-2 p-4">
+        <button
+          type="button"
+          onClick={onStreakTap}
+          className="card flex items-center gap-2 p-4 text-left active:scale-[0.99]"
+        >
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
             <Flame size={20} />
           </div>
           <div>
             <div className="text-sm font-bold">连续 {me?.stats.streak ?? 0} 天</div>
-            <div className="text-[11px] text-ink-500">坚持就是胜利 💪</div>
+            <div className="text-[11px] text-ink-500">点击查看下一里程碑 💪</div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* 成就 */}
-      <section className="mt-4">
+      <section className="mt-4" ref={achievementsRef}>
         <div className="mb-1.5 flex items-center justify-between">
           <h3 className="text-sm font-bold">我的成就</h3>
-          <span className="text-xs text-ink-500">{me?.stats.achievements ?? 0} / {ACHIEVEMENTS.length}</span>
+          <span className="text-xs text-ink-500">
+            {me?.stats.achievements ?? 0} / {ACHIEVEMENTS.length}
+          </span>
         </div>
         <div className="card grid grid-cols-4 gap-3 p-4">
-          {ACHIEVEMENTS.slice(0, 8).map((a) => (
-            <div key={a.code} className="flex flex-col items-center text-center">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-2xl">
-                {a.icon}
-              </div>
-              <div className="mt-1 text-[11px] font-semibold leading-tight">{a.title}</div>
-            </div>
-          ))}
+          {ACHIEVEMENTS.slice(0, 8).map((a) => {
+            const p = getProgress(a.code, statsForProgress, totalMinutes)
+            const unlocked = !p.unknown && p.current >= p.target
+            return (
+              <button
+                key={a.code}
+                type="button"
+                onClick={() => setOpenedAchievement(a)}
+                className="flex flex-col items-center text-center transition active:scale-95"
+                aria-label={`查看「${a.title}」成就进度`}
+              >
+                <div
+                  className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl transition ${
+                    unlocked
+                      ? 'bg-gradient-to-br from-brand-300 to-brand-500 text-white shadow-card'
+                      : 'bg-brand-50 grayscale-[40%] opacity-80'
+                  }`}
+                >
+                  {a.icon}
+                </div>
+                <div className="mt-1 text-[11px] font-semibold leading-tight">{a.title}</div>
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -146,7 +281,7 @@ export default function Profile() {
           <span className="text-xs text-ink-500">近 6 个月</span>
         </div>
         <div className="card p-4">
-          <Heatmap days={heatmap} />
+          <Heatmap days={heatmap} onSelectDay={onHeatmapTap} />
           <div className="mt-3 flex items-center justify-end gap-1 text-[10px] text-ink-500">
             少
             <span style={{ background: '#fff1e0' }} className="inline-block h-3 w-3 rounded-sm" />
@@ -233,6 +368,16 @@ export default function Profile() {
           <ChevronRight size={18} className="text-ink-500" />
         </button>
       </section>
+
+      <AchievementSheet
+        item={openedAchievement}
+        progress={
+          openedAchievement
+            ? getProgress(openedAchievement.code, statsForProgress, totalMinutes)
+            : undefined
+        }
+        onClose={() => setOpenedAchievement(null)}
+      />
     </div>
   )
 }

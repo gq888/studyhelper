@@ -3,48 +3,21 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import {
+  Bell,
+  BellOff,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
   ClipboardPaste,
   Edit3,
-  Link2,
+  Layers,
   Sparkles,
 } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
 import { api } from '@/api/client'
+import { ensureNotificationPermission, startVideoExtract, useBgTasks } from '@/store/bgTasks'
 
-type Phase = 'idle' | 'subtitle' | 'outline' | 'done'
-
-interface ExtractCourseResp {
-  id?: string
-  title?: string
-}
-
-interface VideoTaskResp {
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | string
-  taskId: string
-  subtitleText?: string
-  plainText?: string
-  subtitleUrl?: string | null
-  error?: string
-}
-
-const SUBTITLE_STEPS = [
-  '📥 提交解析任务…',
-  '🎬 下载视频音轨…',
-  '🎙 自动语音识别中…',
-  '📜 整理 SRT 字幕…',
-  '✅ 字幕提取完成',
-]
-const OUTLINE_STEPS = [
-  '🧠 书院熊在阅读字幕…',
-  '🎯 提炼学习目标…',
-  '📚 拆解章节大纲…',
-  '💡 准备学习 tips…',
-  '✨ 整理输出 JSON…',
-]
-const SUBTITLE_SOFT_TIMEOUT_SEC = 240 // 4 分钟后出现「可能已失败」提示，但不主动停
+const SUBTITLE_SOFT_TIMEOUT_SEC = 240
 
 export default function Extract() {
   const nav = useNavigate()
@@ -52,55 +25,45 @@ export default function Extract() {
   const [hint, setHint] = useState('')
   const [advanced, setAdvanced] = useState(false)
   const [manualContent, setManualContent] = useState('')
-
-  const [phase, setPhase] = useState<Phase>('idle')
-  const [progress, setProgress] = useState(0)
-  const [stepIdx, setStepIdx] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [softTimeout, setSoftTimeout] = useState(false)
-  const [elapsedSec, setElapsedSec] = useState(0)
 
-  const cancelRef = useRef(false)
+  /** 当前页面正在追踪的后台任务 id（页面挂载期间持有） */
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+  // 取出该任务的实时状态（订阅 store）
+  const task = useBgTasks((s) => s.tasks.find((t) => t.id === activeTaskId) ?? null)
+  const setNotify = useBgTasks((s) => s.setNotify)
+  const setBackground = useBgTasks((s) => s.setBackground)
+  const cancel = useBgTasks((s) => s.cancel)
 
-  // 进度条 + 阶段轮换
+  // 进入页面时若已有一个进行中的 video-extract 任务，自动接续显示
   useEffect(() => {
-    if (phase !== 'subtitle' && phase !== 'outline') {
-      setProgress(0)
-      setStepIdx(0)
-      setSoftTimeout(false)
-      setElapsedSec(0)
-      return
-    }
-    setProgress(6)
-    const tick = setInterval(() => {
-      setProgress((p) => {
-        const delta = Math.max(0.4, (92 - p) * 0.05)
-        return Math.min(p + delta, 92)
-      })
-    }, 280)
-    const rot = setInterval(() => {
-      const steps = phase === 'subtitle' ? SUBTITLE_STEPS : OUTLINE_STEPS
-      setStepIdx((i) => (i + 1) % steps.length)
-    }, 1800)
-    return () => {
-      clearInterval(tick)
-      clearInterval(rot)
-    }
-  }, [phase])
+    if (activeTaskId) return
+    const running = useBgTasks
+      .getState()
+      .tasks.find((t) => t.kind === 'video-extract' && (t.stage === 'subtitle' || t.stage === 'outline' || t.stage === 'submitting'))
+    if (running) setActiveTaskId(running.id)
+  }, [activeTaskId])
 
-  // 字幕阶段计时 + 超时提示
+  // 任务完成后跳转到结果页
+  const navigatedRef = useRef(false)
   useEffect(() => {
-    if (phase !== 'subtitle') return
-    const startedAt = Date.now()
-    setElapsedSec(0)
-    setSoftTimeout(false)
-    const t = setInterval(() => {
-      const sec = Math.floor((Date.now() - startedAt) / 1000)
-      setElapsedSec(sec)
-      if (sec >= SUBTITLE_SOFT_TIMEOUT_SEC) setSoftTimeout(true)
-    }, 1000)
-    return () => clearInterval(t)
-  }, [phase])
+    if (!task || navigatedRef.current) return
+    if (task.stage === 'done' && task.resultPath) {
+      navigatedRef.current = true
+      toast.success('课程已生成 🎉')
+      nav(task.resultPath, { replace: true })
+    }
+    if (task.stage === 'error') {
+      setErrorMsg(task.error ?? '解析失败，请重试')
+      setActiveTaskId(null)
+      setAdvanced(true)
+    }
+    if (task.stage === 'cancelled') {
+      setActiveTaskId(null)
+      setErrorMsg('已终止，请改用手动粘贴文案')
+      setAdvanced(true)
+    }
+  }, [task, nav])
 
   async function tryPaste(setter: (v: string) => void) {
     try {
@@ -113,92 +76,43 @@ export default function Extract() {
     }
   }
 
-  /** 把字幕/手动文案送到 AI 大纲生成 */
-  async function runOutlineStage(content: string) {
-    setPhase('outline')
-    try {
-      const data = await api<ExtractCourseResp>('/ai/extract-course', {
-        method: 'POST',
-        json: { sourceUrl: url || undefined, content, hint: hint || undefined },
-      })
-      if (data?.id) {
-        setPhase('done')
-        toast.success('课程已生成 🎉')
-        nav(`/course/${data.id}`, { replace: true })
-      } else {
-        throw new Error('AI 返回缺少课程 id')
-      }
-    } catch (e: any) {
-      const msg: string = e?.data?.detail ?? e?.message ?? '生成失败'
-      if (msg.includes('ModelNotOpen') || msg.includes('does not exist'))
-        toast.error('请先在火山方舟控制台开通 doubao-seed 模型服务', { duration: 5000 })
-      else toast.error('AI 大纲生成失败')
-      setPhase('idle')
-    }
-  }
-
-  /** 提交 URL → 轮询字幕 → AI 大纲 */
-  async function runFromUrl() {
+  function runFromUrl() {
     if (!url.trim()) return toast('请粘贴视频链接')
-    cancelRef.current = false
     setErrorMsg(null)
-    setPhase('subtitle')
-
-    let taskId: string
-    try {
-      const submit = await api<{ taskId: string }>('/extract/video', {
-        method: 'POST',
-        json: { url: url.trim() },
-      })
-      taskId = submit.taskId
-    } catch (e: any) {
-      const msg = e?.data?.detail ?? e?.message ?? ''
-      if (e?.status === 503 || /not_configured/.test(msg)) {
-        setErrorMsg('视频解析服务未配置 COZE_API_TOKEN，请改用手动粘贴')
-      } else {
-        setErrorMsg('提交解析任务失败：' + String(msg).slice(0, 120))
-      }
-      setPhase('idle')
-      setAdvanced(true)
-      return
-    }
-
-    // 软超时：不主动停，仅在 UI 上提示，让用户自己决定继续还是终止
-    while (!cancelRef.current) {
-      await new Promise((r) => setTimeout(r, 3000))
-      let row: VideoTaskResp
-      try {
-        row = await api<VideoTaskResp>(`/extract/video/${taskId}`)
-      } catch {
-        continue // 暂时网络抖动忽略
-      }
-      if (row.status === 'completed') {
-        const content = (row.plainText || row.subtitleText || '').trim()
-        if (!content) {
-          setErrorMsg('解析成功但没有识别到任何文字，可能是无声视频')
-          setPhase('idle')
-          setAdvanced(true)
-          return
-        }
-        await runOutlineStage(content)
-        return
-      }
-      if (row.status === 'failed' || row.status === 'cancelled') {
-        setErrorMsg('视频解析失败：' + (row.error?.slice(0, 120) || row.status))
-        setPhase('idle')
-        setAdvanced(true)
-        return
-      }
-      // pending / running → 继续等
-    }
+    const { id } = startVideoExtract({ url: url.trim(), hint: hint.trim() || undefined })
+    setActiveTaskId(id)
   }
 
   async function runFromManual() {
     if (!manualContent.trim()) return toast('请粘贴视频文案 / 字幕')
-    await runOutlineStage(manualContent.trim())
+    setErrorMsg(null)
+    try {
+      const data = await api<{ id?: string; title?: string }>('/ai/extract-course', {
+        method: 'POST',
+        json: { sourceUrl: url || undefined, content: manualContent.trim(), hint: hint || undefined },
+      })
+      if (data?.id) {
+        toast.success('课程已生成 🎉')
+        nav(`/course/${data.id}`, { replace: true })
+      } else {
+        toast.error('生成失败')
+      }
+    } catch {
+      toast.error('AI 大纲生成失败')
+    }
   }
 
-  const busy = phase === 'subtitle' || phase === 'outline'
+  // 运行中视图
+  const busy = task && (task.stage === 'submitting' || task.stage === 'subtitle' || task.stage === 'outline')
+  const elapsedSec = task ? Math.floor((Date.now() - task.startedAt) / 1000) : 0
+  const softTimeout = task?.stage === 'subtitle' && elapsedSec >= SUBTITLE_SOFT_TIMEOUT_SEC
+  // 每秒重渲，让 elapsedSec 动起来
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!busy) return
+    const t = setInterval(() => setTick((x) => x + 1), 1000)
+    return () => clearInterval(t)
+  }, [busy])
 
   return (
     <div className="container-app pt-[max(env(safe-area-inset-top),12px)]">
@@ -210,23 +124,42 @@ export default function Extract() {
         <div className="w-9" />
       </header>
 
-      {busy ? (
+      {busy && task ? (
         <BusyView
-          phase={phase}
-          progress={progress}
-          stepIdx={stepIdx}
+          task={task}
           softTimeout={softTimeout}
           elapsedSec={elapsedSec}
-          onCancel={() => {
-            cancelRef.current = true
-            setPhase('idle')
-            setAdvanced(true)
-            setErrorMsg('已终止解析，请在下方手动粘贴视频文案。')
+          onCancel={() => cancel(task.id)}
+          onMoveToBackground={async () => {
+            // 转后台时默认顺手帮用户开通知（如果浏览器/系统允许）
+            if (!task.notifyOnComplete) {
+              const ok = await ensureNotificationPermission()
+              if (ok) setNotify(task.id, true)
+              else {
+                toast('已转后台。浏览器无法保证后台通知，建议安装 App 获得稳定提醒')
+                nav('/download')
+                return
+              }
+            }
+            setBackground(task.id, true)
+            toast.success('已转后台，完成时会通知你 🔔')
+            setActiveTaskId(null)
+            nav(-1)
+          }}
+          onToggleNotify={async () => {
+            if (!task.notifyOnComplete) {
+              const ok = await ensureNotificationPermission()
+              if (!ok) {
+                toast.error('通知权限不可用，去装 App 获得稳定提醒')
+                nav('/download')
+                return
+              }
+            }
+            setNotify(task.id, !task.notifyOnComplete)
           }}
         />
       ) : (
         <>
-          {/* 主流程：URL only */}
           <div className="card mt-2 p-4">
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold">视频链接</label>
@@ -265,14 +198,12 @@ export default function Extract() {
             字幕由 Coze 工作流提取 · 大纲由 doubao-seed-2.0-pro 实时生成
           </p>
 
-          {/* 错误降级提示 */}
           {errorMsg && (
             <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               ⚠️ {errorMsg}
             </div>
           )}
 
-          {/* 高级 / 手动模式 */}
           <button
             onClick={() => setAdvanced((v) => !v)}
             className="mt-5 flex w-full items-center justify-center gap-1 text-xs text-ink-500"
@@ -285,7 +216,7 @@ export default function Extract() {
             <div className="card mt-3 p-4">
               <label className="text-sm font-semibold">视频文案 / 简介 / 字幕</label>
               <p className="mt-1 text-[11px] text-ink-500">
-                如果视频无声或链接不支持解析，可以手动复制视频文案来这里。
+                如果视频无声或链接不支持解析，可以手动复制视频文案到这里。
               </p>
               <textarea
                 className="input mt-2 h-40 resize-none"
@@ -305,78 +236,86 @@ export default function Extract() {
 }
 
 function BusyView({
-  phase,
-  progress,
-  stepIdx,
+  task,
   softTimeout,
   elapsedSec,
   onCancel,
+  onMoveToBackground,
+  onToggleNotify,
 }: {
-  phase: Exclude<Phase, 'idle' | 'done'>
-  progress: number
-  stepIdx: number
+  task: { stage: string; progress: number; stageLabel: string; notifyOnComplete: boolean }
   softTimeout: boolean
   elapsedSec: number
   onCancel: () => void
+  onMoveToBackground: () => void
+  onToggleNotify: () => void
 }) {
-  const isSubtitle = phase === 'subtitle'
-  const steps = isSubtitle ? SUBTITLE_STEPS : OUTLINE_STEPS
+  const isSubtitle = task.stage === 'subtitle' || task.stage === 'submitting'
   const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0')
   const ss = String(elapsedSec % 60).padStart(2, '0')
   return (
-    <div className="flex flex-col items-center py-10">
+    <div className="flex flex-col items-center py-8">
       <Mascot size={140} mood={isSubtitle ? 'thinking' : 'reading'} bobbing />
       <div className="mt-4 text-base font-bold">
         {isSubtitle ? '正在提取视频字幕…' : '书院熊正在整理学习大纲…'}
       </div>
-      <div className="mt-1 h-5 text-xs text-ink-500">{steps[stepIdx]}</div>
+      <div className="mt-1 h-5 text-xs text-ink-500">{task.stageLabel}</div>
 
       <div className="mt-5 h-2.5 w-full max-w-sm overflow-hidden rounded-full bg-brand-100">
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
-          animate={{ width: `${progress}%` }}
+          animate={{ width: `${task.progress}%` }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
         />
       </div>
 
-      {/* 两阶段指示 */}
       <div className="mt-3 flex items-center gap-2 text-[11px] text-ink-500">
         <span className={isSubtitle ? 'font-semibold text-brand-700' : ''}>① 字幕提取</span>
         <span>→</span>
         <span className={!isSubtitle ? 'font-semibold text-brand-700' : ''}>② AI 大纲</span>
       </div>
-
       <div className="mt-1 flex w-full max-w-sm items-center justify-between text-[11px] text-ink-500">
         <span>{isSubtitle ? 'Coze 工作流' : 'doubao-seed-2.0-pro'}</span>
-        <span className="tabular-nums">
-          {Math.round(progress)}%
-          {isSubtitle && elapsedSec > 0 ? ` · ${mm}:${ss}` : ''}
-        </span>
+        <span className="tabular-nums">{Math.round(task.progress)}% · {mm}:{ss}</span>
       </div>
 
-      <p className="mt-4 text-center text-[11px] text-ink-500">
-        {isSubtitle ? '语音识别通常 30-120 秒，会一直等到接口返回结果。' : '通常 10-20 秒。'}
-      </p>
+      {/* 后台 + 通知开关 */}
+      <div className="mt-5 flex w-full max-w-sm flex-col gap-2">
+        <button
+          onClick={onMoveToBackground}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition active:scale-[0.98] hover:bg-brand-600"
+        >
+          <Layers size={14} /> 改为后台运行 · 完成时通知我
+        </button>
+        <button
+          onClick={onToggleNotify}
+          className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-2 text-xs font-semibold transition ${
+            task.notifyOnComplete
+              ? 'bg-amber-500 text-white shadow-card'
+              : 'bg-white text-ink-700 shadow-card hover:bg-amber-50'
+          }`}
+        >
+          {task.notifyOnComplete ? <Bell size={12} /> : <BellOff size={12} />}
+          {task.notifyOnComplete ? '完成时通知已开启' : '完成时也通知我'}
+        </button>
+      </div>
 
-      {isSubtitle && softTimeout && (
+      {softTimeout && (
         <div className="mt-4 w-full max-w-sm rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          ⏰ 接口响应时间超过 4 分钟，可能已失败（如无声视频 / 平台不支持）。
-          建议终止轮询并改用手动粘贴文案。
+          ⏰ 接口响应超过 4 分钟，可能已失败（如无声视频）。建议终止并改用手动粘贴。
         </div>
       )}
 
-      {isSubtitle && (
-        <button
-          onClick={onCancel}
-          className={`mt-4 inline-flex items-center justify-center gap-1 rounded-2xl px-4 py-2 text-xs font-semibold transition ${
-            softTimeout
-              ? 'bg-amber-500 text-white shadow-card active:scale-[0.98] hover:bg-amber-600'
-              : 'text-ink-500 underline'
-          }`}
-        >
-          {softTimeout ? '终止轮询并改用手动粘贴' : '取消并改用手动粘贴'}
-        </button>
-      )}
+      <button
+        onClick={onCancel}
+        className={`mt-4 inline-flex items-center justify-center gap-1 rounded-2xl px-4 py-2 text-xs font-semibold transition ${
+          softTimeout
+            ? 'bg-amber-500 text-white shadow-card active:scale-[0.98] hover:bg-amber-600'
+            : 'text-ink-500 underline'
+        }`}
+      >
+        {softTimeout ? '终止轮询并改用手动粘贴' : '取消并改用手动粘贴'}
+      </button>
     </div>
   )
 }

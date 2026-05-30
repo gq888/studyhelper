@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/store/auth'
 import { BottomNav, SideNav } from '@/components/BottomNav'
+import { BackgroundTaskFloater } from '@/components/BackgroundTaskFloater'
 import Splash from '@/pages/Splash'
 import Login from '@/pages/Login'
 import Home from '@/pages/Home'
@@ -65,6 +66,7 @@ export default function App() {
         </Routes>
       </main>
       <BottomNav />
+      <BackgroundTaskFloater />
     </div>
   )
 }

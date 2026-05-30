@@ -18,12 +18,15 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install dependencies
+        run: |
+          npm config set registry https://registry.npmmirror.com
+          npm install
+
       - name: Build web and sync
         run: |
+          npm run build -w web
           cd web
-          npm config set registry https://registry.npmmirror.com
-          npm install --ignore-scripts
-          npm run build
           npx cap sync android
 
       - name: Setup JDK 17

@@ -21,6 +21,7 @@ export default function Plans() {
   const { plans, loadingPlans, createPlan, creating, generateWithAI, generating, removePlan } = usePlan()
   const [showNew, setShowNew] = useState(params.get('new') === '1')
   const [showAI, setShowAI] = useState(params.get('ai') === '1')
+  const initialCourseId = params.get('courseId') ?? undefined
 
   useEffect(() => {
     if (params.get('new') === '1') setShowNew(true)
@@ -30,9 +31,10 @@ export default function Plans() {
   const closeAll = () => {
     setShowNew(false)
     setShowAI(false)
-    if (params.get('new') || params.get('ai')) {
+    if (params.get('new') || params.get('ai') || params.get('courseId')) {
       params.delete('new')
       params.delete('ai')
+      params.delete('courseId')
       setParams(params, { replace: true })
     }
   }
@@ -130,6 +132,7 @@ export default function Plans() {
       {showAI && (
         <AIGenerateSheet
           onClose={closeAll}
+          initialCourseId={initialCourseId}
           onGenerate={(p) =>
             generateWithAI(p, {
               onSuccess: (created: any) => {
@@ -159,20 +162,36 @@ function AIGenerateSheet({
   onClose,
   onGenerate,
   generating,
+  initialCourseId,
 }: {
   onClose: () => void
   onGenerate: (p: { goal: string; weeks: number; weeklyHours: number; courseIds: string[] }) => void
   generating: boolean
+  initialCourseId?: string
 }) {
   const [goal, setGoal] = useState('')
   const [weeks, setWeeks] = useState(2)
   const [weeklyHours, setWeeklyHours] = useState(6)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set(initialCourseId ? [initialCourseId] : []),
+  )
   const [progress, setProgress] = useState(0)
   const [stepIdx, setStepIdx] = useState(0)
   const { data: mine = [] } = useQuery({
     queryKey: ['my-courses'],
     queryFn: () => api<MyCourse[]>('/courses?ownerOnly=true'),
+  })
+  // 如果 initialCourseId 变化，自动补选
+  useEffect(() => {
+    if (initialCourseId) {
+      setSelected((s) => (s.has(initialCourseId) ? s : new Set([...s, initialCourseId])))
+    }
+  }, [initialCourseId])
+  // 单独拉初始课程信息（即使不属于当前用户，也能在顶部显示「围绕这门课排期」）
+  const { data: initialCourse } = useQuery({
+    queryKey: ['course-min', initialCourseId],
+    queryFn: () => api<{ id: string; title: string; estimatedHours: number }>(`/courses/${initialCourseId}`),
+    enabled: !!initialCourseId,
   })
 
   // 等待动画：generating 时推进进度（缓动到 92%，完成后由父组件 close 关闭）
@@ -238,11 +257,26 @@ function AIGenerateSheet({
             <div className="text-base font-bold">✨ AI 生成学习计划</div>
             <p className="mt-1 text-xs text-ink-500">告诉书院熊你的目标，它会安排好每一天。</p>
 
+            {initialCourse && (
+              <div className="mt-3 flex items-center gap-2 rounded-2xl bg-brand-50 p-2.5 text-xs">
+                <Sparkles size={14} className="shrink-0 text-brand-600" />
+                <span className="line-clamp-1 text-ink-700">
+                  将围绕课程
+                  <span className="font-semibold text-brand-700"> 《{initialCourse.title}》 </span>
+                  排期
+                </span>
+              </div>
+            )}
+
             <label className="mt-4 block text-sm font-semibold">学习目标</label>
             <textarea
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder="例：两周内入门 Python 并完成一个小项目"
+              placeholder={
+                initialCourse
+                  ? `例：${weeks} 周内完成《${initialCourse.title.slice(0, 16)}》`
+                  : '例：两周内入门 Python 并完成一个小项目'
+              }
               className="input mt-1 h-20 resize-none"
             />
 

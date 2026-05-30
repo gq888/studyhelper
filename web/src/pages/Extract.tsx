@@ -44,7 +44,7 @@ const OUTLINE_STEPS = [
   '💡 准备学习 tips…',
   '✨ 整理输出 JSON…',
 ]
-const SUBTITLE_TIMEOUT_MS = 240_000 // 4 分钟硬上限
+const SUBTITLE_SOFT_TIMEOUT_SEC = 240 // 4 分钟后出现「可能已失败」提示，但不主动停
 
 export default function Extract() {
   const nav = useNavigate()
@@ -57,6 +57,8 @@ export default function Extract() {
   const [progress, setProgress] = useState(0)
   const [stepIdx, setStepIdx] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [softTimeout, setSoftTimeout] = useState(false)
+  const [elapsedSec, setElapsedSec] = useState(0)
 
   const cancelRef = useRef(false)
 
@@ -65,6 +67,8 @@ export default function Extract() {
     if (phase !== 'subtitle' && phase !== 'outline') {
       setProgress(0)
       setStepIdx(0)
+      setSoftTimeout(false)
+      setElapsedSec(0)
       return
     }
     setProgress(6)
@@ -82,6 +86,20 @@ export default function Extract() {
       clearInterval(tick)
       clearInterval(rot)
     }
+  }, [phase])
+
+  // 字幕阶段计时 + 超时提示
+  useEffect(() => {
+    if (phase !== 'subtitle') return
+    const startedAt = Date.now()
+    setElapsedSec(0)
+    setSoftTimeout(false)
+    const t = setInterval(() => {
+      const sec = Math.floor((Date.now() - startedAt) / 1000)
+      setElapsedSec(sec)
+      if (sec >= SUBTITLE_SOFT_TIMEOUT_SEC) setSoftTimeout(true)
+    }, 1000)
+    return () => clearInterval(t)
   }, [phase])
 
   async function tryPaste(setter: (v: string) => void) {
@@ -145,14 +163,8 @@ export default function Extract() {
       return
     }
 
-    const started = Date.now()
+    // 软超时：不主动停，仅在 UI 上提示，让用户自己决定继续还是终止
     while (!cancelRef.current) {
-      if (Date.now() - started > SUBTITLE_TIMEOUT_MS) {
-        setErrorMsg('视频已超过 4 分钟未识别完，可能无人声或平台不支持，请改用手动粘贴文案。')
-        setPhase('idle')
-        setAdvanced(true)
-        return
-      }
       await new Promise((r) => setTimeout(r, 3000))
       let row: VideoTaskResp
       try {
@@ -199,7 +211,19 @@ export default function Extract() {
       </header>
 
       {busy ? (
-        <BusyView phase={phase} progress={progress} stepIdx={stepIdx} onCancel={() => { cancelRef.current = true; setPhase('idle') }} />
+        <BusyView
+          phase={phase}
+          progress={progress}
+          stepIdx={stepIdx}
+          softTimeout={softTimeout}
+          elapsedSec={elapsedSec}
+          onCancel={() => {
+            cancelRef.current = true
+            setPhase('idle')
+            setAdvanced(true)
+            setErrorMsg('已终止解析，请在下方手动粘贴视频文案。')
+          }}
+        />
       ) : (
         <>
           {/* 主流程：URL only */}
@@ -283,15 +307,21 @@ function BusyView({
   phase,
   progress,
   stepIdx,
+  softTimeout,
+  elapsedSec,
   onCancel,
 }: {
   phase: Exclude<Phase, 'idle' | 'done'>
   progress: number
   stepIdx: number
+  softTimeout: boolean
+  elapsedSec: number
   onCancel: () => void
 }) {
   const isSubtitle = phase === 'subtitle'
   const steps = isSubtitle ? SUBTITLE_STEPS : OUTLINE_STEPS
+  const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0')
+  const ss = String(elapsedSec % 60).padStart(2, '0')
   return (
     <div className="flex flex-col items-center py-10">
       <Mascot size={140} mood={isSubtitle ? 'thinking' : 'reading'} bobbing />
@@ -317,16 +347,33 @@ function BusyView({
 
       <div className="mt-1 flex w-full max-w-sm items-center justify-between text-[11px] text-ink-500">
         <span>{isSubtitle ? 'Coze 工作流' : 'doubao-seed-2.0-pro'}</span>
-        <span className="tabular-nums">{Math.round(progress)}%</span>
+        <span className="tabular-nums">
+          {Math.round(progress)}%
+          {isSubtitle && elapsedSec > 0 ? ` · ${mm}:${ss}` : ''}
+        </span>
       </div>
 
       <p className="mt-4 text-center text-[11px] text-ink-500">
-        {isSubtitle ? '语音识别约 30-120 秒，最长 4 分钟后自动放弃。' : '通常 10-20 秒。'}
+        {isSubtitle ? '语音识别通常 30-120 秒，会一直等到接口返回结果。' : '通常 10-20 秒。'}
       </p>
 
+      {isSubtitle && softTimeout && (
+        <div className="mt-4 w-full max-w-sm rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          ⏰ 接口响应时间超过 4 分钟，可能已失败（如无声视频 / 平台不支持）。
+          建议终止轮询并改用手动粘贴文案。
+        </div>
+      )}
+
       {isSubtitle && (
-        <button onClick={onCancel} className="mt-5 text-xs text-ink-500 underline">
-          取消并改用手动粘贴
+        <button
+          onClick={onCancel}
+          className={`mt-4 inline-flex items-center justify-center gap-1 rounded-2xl px-4 py-2 text-xs font-semibold transition ${
+            softTimeout
+              ? 'bg-amber-500 text-white shadow-card active:scale-[0.98] hover:bg-amber-600'
+              : 'text-ink-500 underline'
+          }`}
+        >
+          {softTimeout ? '终止轮询并改用手动粘贴' : '取消并改用手动粘贴'}
         </button>
       )}
     </div>

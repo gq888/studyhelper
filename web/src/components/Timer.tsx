@@ -5,12 +5,14 @@ interface PomoTimerProps {
   minutes: number
   label?: string
   onFinish?: () => void
+  /** 是否自动开始计时。历史会话里渲染的旧消息应传 false，避免一进会话就响一片闹钟 */
+  autoStart?: boolean
 }
 
-export function PomoTimer({ minutes, label, onFinish }: PomoTimerProps) {
+export function PomoTimer({ minutes, label, onFinish, autoStart = true }: PomoTimerProps) {
   const total = minutes * 60
   const [remain, setRemain] = useState(total)
-  const [running, setRunning] = useState(true)
+  const [running, setRunning] = useState(autoStart)
   const finishedRef = useRef(false)
 
   useEffect(() => {

@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
-  Check,
+  CheckCircle2,
   ChevronLeft,
   Clock3,
   ListChecks,
   MessageCircle,
+  Play,
   Trash2,
 } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
@@ -113,7 +114,12 @@ export default function PlanDetail() {
       <div className="mt-5 flex items-center gap-2 text-sm font-bold">
         <ListChecks size={16} /> 任务列表
         <button
-          onClick={() => nav(`/chat?planId=${plan.id}`)}
+          onClick={() => {
+            const qs = new URLSearchParams({ planId: plan.id })
+            const ids = (plan.courses ?? []).map((c) => c.id).filter(Boolean)
+            if (ids.length) qs.set('courseIds', ids.join(','))
+            nav(`/chat?${qs.toString()}`)
+          }}
           className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600"
         >
           <MessageCircle size={12} /> 让书院熊答疑
@@ -138,36 +144,71 @@ export default function PlanDetail() {
                 </div>
                 <div className="space-y-2">
                   {(items ?? []).map((it) => (
-                    <div key={it.id} className={`flex items-start gap-3 rounded-2xl p-3 shadow-card ${it.done ? 'bg-brand-50/60 opacity-70' : 'bg-white'}`}>
-                      <button
-                        onClick={() => toggleItem({ planId: plan.id, itemId: it.id, done: !it.done })}
-                        className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition ${
-                          it.done ? 'border-brand-500 bg-brand-500 text-white' : 'border-brand-300 hover:border-brand-500'
-                        }`}
-                      >
-                        {it.done && <Check size={14} />}
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-[14px] font-semibold ${it.done ? 'line-through' : ''}`}>{it.title}</div>
-                        {it.note && <div className="mt-0.5 text-[11px] text-ink-500">{it.note}</div>}
-                        <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-500">
-                          <Clock3 size={10} /> {it.minutes} 分钟
-                          {it.courseId && (
-                            <button
-                              onClick={() => nav(`/course/${it.courseId}`)}
-                              className="text-brand-600"
-                            >
-                              · 关联课程
-                            </button>
-                          )}
+                    <div
+                      key={it.id}
+                      className={`rounded-2xl p-3 shadow-card ${
+                        it.done ? 'bg-emerald-50/60' : 'bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-[14px] font-semibold leading-snug ${it.done ? 'text-ink-500 line-through' : ''}`}>
+                            {it.title}
+                          </div>
+                          {it.note && <div className="mt-0.5 text-[11px] text-ink-500">{it.note}</div>}
+                          <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-500">
+                            <Clock3 size={10} /> {it.minutes} 分钟
+                            {it.courseId && (
+                              <button
+                                onClick={() => nav(`/course/${it.courseId}`)}
+                                className="text-brand-600"
+                              >
+                                · 关联课程
+                              </button>
+                            )}
+                          </div>
                         </div>
+                        <button
+                          onClick={() => deleteItem({ planId: plan.id, itemId: it.id })}
+                          className="shrink-0 p-1 text-ink-400 hover:text-red-500"
+                          aria-label="删除任务"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => deleteItem({ planId: plan.id, itemId: it.id })}
-                        className="text-ink-400 hover:text-red-500"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            toggleItem({ planId: plan.id, itemId: it.id, done: !it.done })
+                          }
+                          className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-semibold transition active:scale-[0.98] ${
+                            it.done
+                              ? 'bg-emerald-500 text-white shadow-card hover:bg-emerald-600'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          <CheckCircle2 size={14} />
+                          {it.done ? '✓ 已掌握' : '标记已掌握'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const qs = new URLSearchParams({
+                              planId: plan.id,
+                              itemId: it.id,
+                              autoSend: `我要开始学习这个任务：${it.title}（${it.minutes} 分钟）`,
+                            })
+                            const courseIds = (plan.courses ?? []).map((c) => c.id).filter(Boolean)
+                            if (courseIds.length) qs.set('courseIds', courseIds.join(','))
+                            nav(`/chat?${qs.toString()}`)
+                          }}
+                          disabled={it.done}
+                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white shadow-card transition active:scale-[0.98] hover:bg-brand-600 disabled:opacity-40 disabled:hover:bg-brand-500"
+                        >
+                          <Play size={13} />
+                          {it.done ? '已掌握' : '开始学习'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

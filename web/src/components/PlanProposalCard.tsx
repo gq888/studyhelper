@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CalendarRange, Clock3, Sparkles, Target } from 'lucide-react'
-import { usePlan } from '@/hooks/usePlan'
+import { Bell, BellOff, CalendarRange, Clock3, Layers, Sparkles, Target } from 'lucide-react'
+import { ensureNotificationPermission, startPlanGenerate, useBgTasks } from '@/store/bgTasks'
 
 /**
  * 从 AI 回复中提取 PLAN 标记：
@@ -54,52 +54,64 @@ const STEPS = [
 
 export function PlanProposalCard({ proposal, onCreated, historical = false }: Props) {
   const nav = useNavigate()
-  const { generateWithAI, generating } = usePlan()
-  const [progress, setProgress] = useState(0)
-  const [step, setStep] = useState(0)
-  const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
-  const [createdPlan, setCreatedPlan] = useState<{ id: string; title: string } | null>(null)
+  const [taskId, setTaskId] = useState<string | null>(null)
+  // 订阅本卡片对应的后台任务
+  const task = useBgTasks((s) => s.tasks.find((t) => t.id === taskId) ?? null)
+  const setNotify = useBgTasks((s) => s.setNotify)
+  const setBackground = useBgTasks((s) => s.setBackground)
 
-  // 缓动进度条
-  if (generating && !busy) setBusy(true)
+  // 任务完成时回调父组件（让 Chat 自动引用新计划）
+  useEffect(() => {
+    if (!task || !onCreated) return
+    if (task.stage === 'done' && task.result?.id) {
+      onCreated({ id: task.result.id, title: task.result.title })
+    }
+  }, [task, onCreated])
 
   const runGenerate = () => {
-    setBusy(true)
-    setProgress(6)
-    setStep(0)
-    const tick = setInterval(() => {
-      setProgress((p) => Math.min(p + Math.max(0.6, (92 - p) * 0.07), 92))
-    }, 280)
-    const rot = setInterval(() => setStep((i) => (i + 1) % STEPS.length), 1800)
-    generateWithAI(
-      {
-        goal: proposal.goal,
-        weeks: proposal.weeks,
-        weeklyHours: proposal.hours,
-        courseIds: proposal.courseIds,
-      },
-      {
-        onSuccess: (p: any) => {
-          clearInterval(tick)
-          clearInterval(rot)
-          setProgress(100)
-          setDone(true)
-          if (p?.id) {
-            const created = { id: p.id, title: p.title ?? proposal.goal }
-            setCreatedPlan(created)
-            onCreated?.(created)
-          }
-        },
-        onError: () => {
-          clearInterval(tick)
-          clearInterval(rot)
-          setBusy(false)
-          toast.error('生成失败，请稍后重试')
-        },
-      },
-    )
+    const { id } = startPlanGenerate({
+      goal: proposal.goal,
+      weeks: proposal.weeks,
+      weeklyHours: proposal.hours,
+      courseIds: proposal.courseIds,
+    })
+    setTaskId(id)
   }
+
+  const moveToBackground = async () => {
+    if (!task) return
+    if (!task.notifyOnComplete) {
+      const ok = await ensureNotificationPermission()
+      if (ok) setNotify(task.id, true)
+      else {
+        toast('已转后台。浏览器无法保证后台通知，建议安装 App 获得稳定提醒')
+        nav('/download')
+        return
+      }
+    }
+    setBackground(task.id, true)
+    toast.success('已转后台，完成时会通知你 🔔')
+    setTaskId(null)
+  }
+
+  const toggleNotify = async () => {
+    if (!task) return
+    if (!task.notifyOnComplete) {
+      const ok = await ensureNotificationPermission()
+      if (!ok) {
+        toast.error('通知权限不可用，去装 App 获得稳定提醒')
+        nav('/download')
+        return
+      }
+    }
+    setNotify(task.id, !task.notifyOnComplete)
+  }
+
+  const busy = !!task && task.stage === 'plan-generating'
+  const done = task?.stage === 'done'
+  const createdPlan = done && task?.result ? { id: task.result.id as string, title: task.result.title as string } : null
+  const progress = task?.progress ?? 0
+  const stageLabel = task?.stageLabel ?? STEPS[0]
 
   if (busy && !done) {
     return (
@@ -108,7 +120,7 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
           <Sparkles size={15} className="animate-pulse" />
           书院熊正在排期…
         </div>
-        <div className="h-[18px] text-[11px] text-ink-500">{STEPS[step]}</div>
+        <div className="h-[18px] text-[11px] text-ink-500">{stageLabel}</div>
         <div className="h-2 overflow-hidden rounded-full bg-brand-100">
           <motion.div
             className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
@@ -116,7 +128,29 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
             transition={{ duration: 0.4, ease: 'easeOut' }}
           />
         </div>
-        <div className="text-right text-[10px] tabular-nums text-ink-500">{Math.round(progress)}%</div>
+        <div className="flex items-center justify-between text-[10px] text-ink-500">
+          <span>doubao-seed-2.0-pro</span>
+          <span className="tabular-nums">{Math.round(progress)}%</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 pt-1">
+          <button
+            onClick={moveToBackground}
+            className="inline-flex items-center justify-center gap-1 rounded-xl bg-brand-500 px-2 py-1.5 text-[11px] font-semibold text-white shadow-card active:scale-[0.98]"
+          >
+            <Layers size={11} /> 转后台 + 通知
+          </button>
+          <button
+            onClick={toggleNotify}
+            className={`inline-flex items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-[11px] font-semibold transition ${
+              task?.notifyOnComplete
+                ? 'bg-amber-500 text-white shadow-card'
+                : 'bg-white text-ink-700 shadow-card'
+            }`}
+          >
+            {task?.notifyOnComplete ? <Bell size={11} /> : <BellOff size={11} />}
+            {task?.notifyOnComplete ? '完成时通知' : '完成时也通知'}
+          </button>
+        </div>
       </div>
     )
   }

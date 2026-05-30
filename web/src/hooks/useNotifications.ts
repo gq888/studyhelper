@@ -86,8 +86,20 @@ export function useNotifications() {
   const scheduleAt = useCallback(
     async (opts: { id?: string; at: Date; title: string; body: string }) => {
       const targetAt = opts.at.getTime()
-      if (targetAt <= Date.now() + 1000) return false // 已过期/太近
+      const now = Date.now()
+      console.log('[notifications] scheduleAt 被调用')
+      console.log('[notifications] native:', native)
+      console.log('[notifications] targetAt:', new Date(targetAt).toISOString())
+      console.log('[notifications] now:', new Date(now).toISOString())
+      console.log('[notifications] targetAt <= now + 1000:', targetAt <= now + 1000)
+      
+      if (targetAt <= now + 1000) {
+        console.log('[notifications] 返回 false：时间已过期或太近')
+        return false // 已过期/太近
+      }
+      
       const idNum = stableId(opts.id ?? `${opts.title}-${targetAt}`)
+      console.log('[notifications] idNum:', idNum)
 
       if (native) {
         try {
@@ -99,7 +111,10 @@ export function useNotifications() {
             perm = r.display
             console.log('[notifications] 请求后权限:', perm)
           }
-          if (perm !== 'granted') return false
+          if (perm !== 'granted') {
+            console.log('[notifications] 返回 false：权限不足')
+            return false
+          }
           await LocalNotifications.schedule({
             notifications: [
               {

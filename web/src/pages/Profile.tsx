@@ -127,10 +127,18 @@ export default function Profile() {
     streak: me?.stats.streak ?? 0,
   }
 
+  // 计算已完成成就数量
+  const completedAchievements = useMemo(() => {
+    return ACHIEVEMENTS.filter((a) => {
+      const p = getProgress(a.code, statsForProgress, totalMinutes)
+      return !p.unknown && p.current >= p.target
+    }).length
+  }, [statsForProgress, totalMinutes])
+
   // 顶部三个统计的点击行为
   const headerStats: { n: number; l: string; onClick: () => void }[] = [
     {
-      n: me?.stats.achievements ?? 0,
+      n: completedAchievements,
       l: '我的奖章',
       onClick: () =>
         achievementsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
@@ -243,7 +251,7 @@ export default function Profile() {
         <div className="mb-1.5 flex items-center justify-between">
           <h3 className="text-sm font-bold">我的成就</h3>
           <span className="text-xs text-ink-500">
-            {me?.stats.achievements ?? 0} / {ACHIEVEMENTS.length}
+            {completedAchievements} / {ACHIEVEMENTS.length}
           </span>
         </div>
         <div className="card grid grid-cols-4 gap-3 p-4">

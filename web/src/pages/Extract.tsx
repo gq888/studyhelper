@@ -16,6 +16,7 @@ import {
 import { Mascot } from '@/components/Mascot'
 import { api } from '@/api/client'
 import { ensureNotificationPermission, startVideoExtract, useBgTasks } from '@/store/bgTasks'
+import { confirmInstallApp } from '@/components/InstallAppConfirm'
 
 const SUBTITLE_SOFT_TIMEOUT_SEC = 240
 
@@ -136,8 +137,14 @@ export default function Extract() {
               const ok = await ensureNotificationPermission()
               if (ok) setNotify(task.id, true)
               else {
-                toast('已转后台。浏览器无法保证后台通知，建议安装 App 获得稳定提醒')
-                nav('/download')
+                setBackground(task.id, true)
+                setActiveTaskId(null)
+                toast('已转后台运行，但当前环境无法保证后台通知')
+                nav(-1)
+                await confirmInstallApp({
+                  title: '后台运行已就绪',
+                  body: '任务会继续在后台完成。但当前浏览器无法在你离开页面后推送提醒，要下载 App 获得稳定通知吗？',
+                })
                 return
               }
             }
@@ -150,8 +157,10 @@ export default function Extract() {
             if (!task.notifyOnComplete) {
               const ok = await ensureNotificationPermission()
               if (!ok) {
-                toast.error('通知权限不可用，去装 App 获得稳定提醒')
-                nav('/download')
+                await confirmInstallApp({
+                  title: '通知权限不可用',
+                  body: '当前浏览器或系统拒绝了通知权限，无法在任务完成时提醒你。是否下载 App 获得稳定的本地提醒？',
+                })
                 return
               }
             }

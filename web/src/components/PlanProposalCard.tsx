@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Bell, BellOff, CalendarRange, Clock3, Layers, Sparkles, Target } from 'lucide-react'
 import { ensureNotificationPermission, startPlanGenerate, useBgTasks } from '@/store/bgTasks'
+import { confirmInstallApp } from '@/components/InstallAppConfirm'
 
 /**
  * 从 AI 回复中提取 PLAN 标记：
@@ -82,10 +83,17 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
     if (!task) return
     if (!task.notifyOnComplete) {
       const ok = await ensureNotificationPermission()
-      if (ok) setNotify(task.id, true)
-      else {
-        toast('已转后台。浏览器无法保证后台通知，建议安装 App 获得稳定提醒')
-        nav('/download')
+      if (ok) {
+        setNotify(task.id, true)
+      } else {
+        // 任务仍然继续在后台跑，只是提示用户去装 App 获得通知
+        setBackground(task.id, true)
+        setTaskId(null)
+        toast('已转后台运行，但当前环境无法保证后台通知')
+        await confirmInstallApp({
+          title: '后台运行已就绪',
+          body: '任务会继续在后台完成。但当前浏览器无法在你离开页面后推送提醒，要下载 App 获得稳定通知吗？',
+        })
         return
       }
     }
@@ -99,8 +107,10 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
     if (!task.notifyOnComplete) {
       const ok = await ensureNotificationPermission()
       if (!ok) {
-        toast.error('通知权限不可用，去装 App 获得稳定提醒')
-        nav('/download')
+        await confirmInstallApp({
+          title: '通知权限不可用',
+          body: '当前浏览器或系统拒绝了通知权限，无法在任务完成时提醒你。是否下载 App 获得稳定的本地提醒？',
+        })
         return
       }
     }

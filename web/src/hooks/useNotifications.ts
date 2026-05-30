@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { isNative } from '@/native'
-import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
 import { LocalNotifications } from '@capacitor/local-notifications'
 
 /**
@@ -32,7 +30,6 @@ function stableId(seed: string): number {
 }
 
 export function useNotifications() {
-  const nav = useNavigate()
   const [status, setStatus] = useState<NotifyStatus>('unknown')
   const native = isNative()
 
@@ -158,13 +155,16 @@ export function useNotifications() {
     [native],
   )
 
-  /** 引导用户去下载 App（在不支持通知的浏览器里调用） */
+  /** 引导用户去下载 App（在不支持通知的浏览器里调用）。弹确认框，用户同意才跳。 */
   const promoteAppInstall = useCallback(
-    (reason = '此浏览器无法保证后台学习提醒') => {
-      toast(reason + '，去装 App 获得稳定的提醒能力吧 →')
-      nav('/download')
+    async (reason = '当前环境无法保证后台学习提醒') => {
+      const { confirmInstallApp } = await import('@/components/InstallAppConfirm')
+      await confirmInstallApp({
+        title: '下载 App 获得稳定通知',
+        body: reason + '。要下载 App 获得稳定的本地学习提醒能力吗？',
+      })
     },
-    [nav],
+    [],
   )
 
   return {

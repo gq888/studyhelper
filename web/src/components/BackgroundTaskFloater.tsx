@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, BellOff, CheckCircle2, ChevronRight, Loader2, X, XCircle } from 'lucide-react'
 import { ensureNotificationPermission, useBgTasks, type BgTask } from '@/store/bgTasks'
-import toast from 'react-hot-toast'
+import { confirmInstallApp } from '@/components/InstallAppConfirm'
 
 /**
  * 全局浮动指示器：右下角圆形按钮显示进行中任务数量；点击展开抽屉
@@ -79,9 +79,11 @@ export function BackgroundTaskFloater() {
                       if (!t.notifyOnComplete) {
                         const ok = await ensureNotificationPermission()
                         if (!ok) {
-                          toast.error('通知权限不可用，去装 App 获得稳定提醒')
                           setOpen(false)
-                          nav('/download')
+                          await confirmInstallApp({
+                            title: '通知权限不可用',
+                            body: '当前浏览器或系统拒绝了通知权限，无法在任务完成后第一时间提醒你。是否下载 App 获得稳定的本地提醒？',
+                          })
                           return
                         }
                       }

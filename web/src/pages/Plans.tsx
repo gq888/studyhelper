@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
-import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Bell, BellOff, CalendarPlus, ChevronLeft, ChevronRight, Layers, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { usePlan } from '@/hooks/usePlan'
 import { Mascot } from '@/components/Mascot'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { ensureNotificationPermission, startPlanGenerate, useBgTasks } from '@/store/bgTasks'
+import { confirmInstallApp } from '@/components/InstallAppConfirm'
 
 interface MyCourse {
   id: string
@@ -18,10 +20,29 @@ interface MyCourse {
 export default function Plans() {
   const nav = useNavigate()
   const [params, setParams] = useSearchParams()
-  const { plans, loadingPlans, createPlan, creating, generateWithAI, generating, removePlan } = usePlan()
+  const { plans, loadingPlans, createPlan, creating, removePlan } = usePlan()
   const [showNew, setShowNew] = useState(params.get('new') === '1')
   const [showAI, setShowAI] = useState(params.get('ai') === '1')
   const initialCourseId = params.get('courseId') ?? undefined
+  // 当前 Sheet 跟踪的后台任务 id
+  const [aiTaskId, setAiTaskId] = useState<string | null>(null)
+  const aiTask = useBgTasks((s) => s.tasks.find((t) => t.id === aiTaskId) ?? null)
+
+  // 任务完成时关弹层 + 跳详情（如果用户没把它转后台）
+  useEffect(() => {
+    if (!aiTask) return
+    if (aiTask.stage === 'done' && aiTask.result?.id && !aiTask.inBackground) {
+      const planId = aiTask.result.id
+      setAiTaskId(null)
+      closeAll()
+      nav(`/plans/${planId}`)
+    }
+    if (aiTask.stage === 'error' && !aiTask.inBackground) {
+      toast.error('生成失败，请稍后重试')
+      setAiTaskId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiTask?.stage, aiTask?.inBackground])
 
   useEffect(() => {
     if (params.get('new') === '1') setShowNew(true)
@@ -131,18 +152,26 @@ export default function Plans() {
 
       {showAI && (
         <AIGenerateSheet
-          onClose={closeAll}
+          onClose={() => {
+            // 关闭时如果任务还在跑，不要打断 —— 让它继续跑在后台
+            if (aiTask && aiTask.stage === 'plan-generating') {
+              useBgTasks.getState().setBackground(aiTask.id, true)
+              toast('已转后台运行 🔔')
+            }
+            setAiTaskId(null)
+            closeAll()
+          }}
           initialCourseId={initialCourseId}
-          onGenerate={(p) =>
-            generateWithAI(p, {
-              onSuccess: (created: any) => {
-                closeAll()
-                if (created?.id) nav(`/plans/${created.id}`)
-              },
-              onError: () => toast.error('生成失败，请稍后重试'),
+          taskId={aiTaskId}
+          onGenerate={(p) => {
+            const { id } = startPlanGenerate({
+              goal: p.goal,
+              weeks: p.weeks,
+              weeklyHours: p.weeklyHours,
+              courseIds: p.courseIds,
             })
-          }
-          generating={generating}
+            setAiTaskId(id)
+          }}
         />
       )}
       {showNew && <ManualCreateSheet onClose={closeAll} onCreate={(p) => { createPlan(p); closeAll() }} creating={creating} />}
@@ -161,13 +190,14 @@ const GENERATE_STEPS = [
 function AIGenerateSheet({
   onClose,
   onGenerate,
-  generating,
   initialCourseId,
+  taskId,
 }: {
   onClose: () => void
   onGenerate: (p: { goal: string; weeks: number; weeklyHours: number; courseIds: string[] }) => void
-  generating: boolean
   initialCourseId?: string
+  /** 当前正在跑的后台任务 id；非 null 表示进入 busy 视图 */
+  taskId: string | null
 }) {
   const [goal, setGoal] = useState('')
   const [weeks, setWeeks] = useState(2)
@@ -175,8 +205,6 @@ function AIGenerateSheet({
   const [selected, setSelected] = useState<Set<string>>(
     new Set(initialCourseId ? [initialCourseId] : []),
   )
-  const [progress, setProgress] = useState(0)
-  const [stepIdx, setStepIdx] = useState(0)
   const { data: mine = [] } = useQuery({
     queryKey: ['my-courses'],
     queryFn: () => api<MyCourse[]>('/courses?ownerOnly=true'),
@@ -187,35 +215,56 @@ function AIGenerateSheet({
       setSelected((s) => (s.has(initialCourseId) ? s : new Set([...s, initialCourseId])))
     }
   }, [initialCourseId])
-  // 单独拉初始课程信息（即使不属于当前用户，也能在顶部显示「围绕这门课排期」）
+  // 单独拉初始课程信息
   const { data: initialCourse } = useQuery({
     queryKey: ['course-min', initialCourseId],
     queryFn: () => api<{ id: string; title: string; estimatedHours: number }>(`/courses/${initialCourseId}`),
     enabled: !!initialCourseId,
   })
+  // 订阅任务状态
+  const task = useBgTasks((s) => s.tasks.find((t) => t.id === taskId) ?? null)
+  const setNotify = useBgTasks((s) => s.setNotify)
+  const setBackground = useBgTasks((s) => s.setBackground)
+  const nav = useNavigate()
+  const generating = !!task && task.stage === 'plan-generating'
+  const progress = task?.progress ?? 0
+  const stageLabel = task?.stageLabel ?? GENERATE_STEPS[0]
 
-  // 等待动画：generating 时推进进度（缓动到 92%，完成后由父组件 close 关闭）
-  useEffect(() => {
-    if (!generating) {
-      setProgress(0)
-      setStepIdx(0)
-      return
+  const moveToBackground = async () => {
+    if (!task) return
+    if (!task.notifyOnComplete) {
+      const ok = await ensureNotificationPermission()
+      if (ok) setNotify(task.id, true)
+      else {
+        setBackground(task.id, true)
+        toast('已转后台运行，但当前环境无法保证后台通知')
+        onClose()
+        await confirmInstallApp({
+          title: '后台运行已就绪',
+          body: '任务会继续在后台完成。但当前浏览器无法在你离开页面后推送提醒，要下载 App 获得稳定通知吗？',
+        })
+        return
+      }
     }
-    setProgress(6)
-    const tick = setInterval(() => {
-      setProgress((p) => {
-        const delta = Math.max(0.6, (92 - p) * 0.07)
-        return Math.min(p + delta, 92)
-      })
-    }, 250)
-    const stepRot = setInterval(() => {
-      setStepIdx((i) => (i + 1) % GENERATE_STEPS.length)
-    }, 1800)
-    return () => {
-      clearInterval(tick)
-      clearInterval(stepRot)
+    setBackground(task.id, true)
+    toast.success('已转后台，完成时会通知你 🔔')
+    onClose()
+  }
+
+  const toggleNotify = async () => {
+    if (!task) return
+    if (!task.notifyOnComplete) {
+      const ok = await ensureNotificationPermission()
+      if (!ok) {
+        await confirmInstallApp({
+          title: '通知权限不可用',
+          body: '当前浏览器或系统拒绝了通知权限，无法在任务完成时提醒你。是否下载 App 获得稳定的本地提醒？',
+        })
+        return
+      }
     }
-  }, [generating])
+    setNotify(task.id, !task.notifyOnComplete)
+  }
 
   const toggle = (id: string) => {
     const next = new Set(selected)
@@ -234,9 +283,7 @@ function AIGenerateSheet({
           <div className="flex flex-col items-center py-2">
             <Mascot size={108} mood="reading" bobbing />
             <div className="mt-3 text-base font-bold">书院熊正在为你排期…</div>
-            <div className="mt-1 h-5 text-xs text-ink-500">
-              {GENERATE_STEPS[stepIdx]}
-            </div>
+            <div className="mt-1 h-5 text-xs text-ink-500">{stageLabel}</div>
             <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-brand-100">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600"
@@ -251,6 +298,25 @@ function AIGenerateSheet({
             <p className="mt-4 text-center text-[11px] text-ink-500">
               此过程约 10-20 秒，完成后会自动打开计划详情。
             </p>
+            <div className="mt-4 flex w-full flex-col gap-2">
+              <button
+                onClick={moveToBackground}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition active:scale-[0.98] hover:bg-brand-600"
+              >
+                <Layers size={14} /> 改为后台运行 · 完成时通知我
+              </button>
+              <button
+                onClick={toggleNotify}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-2 text-xs font-semibold transition ${
+                  task?.notifyOnComplete
+                    ? 'bg-amber-500 text-white shadow-card'
+                    : 'bg-white text-ink-700 shadow-card hover:bg-amber-50'
+                }`}
+              >
+                {task?.notifyOnComplete ? <Bell size={12} /> : <BellOff size={12} />}
+                {task?.notifyOnComplete ? '完成时通知已开启' : '完成时也通知我'}
+              </button>
+            </div>
           </div>
         ) : (
           <>

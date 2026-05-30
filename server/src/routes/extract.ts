@@ -2,19 +2,46 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/auth.js'
 import { getVideoExtractionTask, srtToPlainText, submitVideoExtraction } from '../services/coze.js'
+import {
+  extractFirstUrl,
+  isDouyinShareUrl,
+  resolveDouyinVideoUrl,
+} from '../services/douyin.js'
 
+// 放宽到字符串，支持「4.62 复制打开抖音… https://v.douyin.com/xxx/ …」这类分享口令
 const submitSchema = z.object({
-  url: z.string().url(),
+  url: z.string().min(1).max(4000),
 })
+
+/** 把用户粘进来的内容标准化成 Coze 可消费的直链；目前仅对抖音做 HTML 解析 */
+async function normalizeVideoUrl(raw: string): Promise<string> {
+  const trimmed = raw.trim()
+  // 既可能是干净 URL，也可能是带文字的分享口令
+  const url = /^https?:\/\//i.test(trimmed) ? trimmed : extractFirstUrl(trimmed)
+  if (!url) throw new Error('未能识别到视频链接')
+  if (isDouyinShareUrl(url)) return resolveDouyinVideoUrl(url)
+  return url
+}
 
 export async function extractRoutes(app: FastifyInstance) {
   /** 提交解析任务，返回 taskId（前端轮询 /api/extract/video/:taskId） */
   app.post('/extract/video', { preHandler: requireAuth }, async (req, reply) => {
     const parsed = submitSchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'bad_input' })
+
+    let videoUrl: string
     try {
-      const taskId = await submitVideoExtraction(parsed.data.url)
-      return { taskId, status: 'pending' as const }
+      videoUrl = await normalizeVideoUrl(parsed.data.url)
+    } catch (e: any) {
+      return reply.code(400).send({
+        error: 'resolve_failed',
+        detail: String(e?.message ?? e).slice(0, 200),
+      })
+    }
+
+    try {
+      const taskId = await submitVideoExtraction(videoUrl)
+      return { taskId, status: 'pending' as const, resolvedUrl: videoUrl }
     } catch (e: any) {
       const msg = String(e?.message ?? e)
       if (msg.includes('未配置'))

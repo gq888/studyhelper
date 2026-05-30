@@ -237,13 +237,14 @@ export default function Extract() {
             </div>
             <input
               className="input mt-2"
-              placeholder="https://www.bilibili.com/video/... 或 mp4 直链"
+              placeholder="bilibili / mp4 直链，或抖音分享口令"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               autoCapitalize="none"
             />
             <p className="mt-2 text-[11px] text-ink-500">
-              支持有人声的中文 / 英文学习视频。无声视频请走「高级 → 手动粘贴文案」。
+              支持 B 站、mp4 直链；抖音可直接整段粘贴「复制打开抖音…」的分享口令。
+              无声视频请走「高级 → 手动粘贴文案」。
             </p>
           </div>
 

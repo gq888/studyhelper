@@ -113,7 +113,8 @@ export default function CoursePage() {
   const scaledHours = (c.estimatedHours * portion).toFixed(1)
 
   return (
-    <div className="container-app pb-32 pt-[max(env(safe-area-inset-top),8px)]">
+    <div className="container-app pb-32">
+      <div className="pt-[max(env(safe-area-inset-top),8px)]" />
       <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between bg-paper/90 px-4 py-3 backdrop-blur">
         <button onClick={() => nav(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card">
           <ChevronLeft size={18} />

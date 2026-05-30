@@ -38,6 +38,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6">
+      <div className="pt-[max(env(safe-area-inset-top), 20px)]" />
       <Mascot size={120} mood="reading" bobbing />
       <h1 className="mt-4 text-2xl font-extrabold text-ink-900">学海小书院</h1>
       <p className="text-sm text-ink-500">{mode === 'login' ? '欢迎回来，今天也要继续学习鸭～' : '从这里开启你的学习冒险'}</p>
@@ -76,6 +77,7 @@ export default function Login() {
           {mode === 'login' ? '还没有账号？立即注册' : '已有账号？返回登录'}
         </button>
       </form>
+      <div className="pb-[max(env(safe-area-inset-bottom), 20px)]" />
     </div>
   )
 }

@@ -4,12 +4,17 @@
 
 :root {
   color-scheme: light;
-  --safe-bottom: env(safe-area-inset-bottom);
-  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 html, body, #root {
   height: 100%;
+  min-width: 320px;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 body {
   margin: 0;
@@ -19,11 +24,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @layer components {
   .container-app {
     @apply mx-auto w-full max-w-[480px] md:max-w-[640px] lg:max-w-3xl xl:max-w-4xl px-4;
+    padding-left: calc(1rem + var(--safe-left));
+    padding-right: calc(1rem + var(--safe-right));
   }
   .btn-primary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-2xl bg-brand-500 px-5 py-3 text-base font-semibold text-white shadow-card transition-all active:scale-[0.98] hover:bg-brand-600 disabled:opacity-50 disabled:hover:bg-brand-500;
@@ -39,6 +48,15 @@ body {
   }
   .input {
     @apply w-full rounded-2xl border border-brand-100 bg-white px-4 py-3 text-base outline-none transition focus:border-brand-400 focus:shadow-ring;
+  }
+  .safe-top-padding {
+    padding-top: var(--safe-top);
+  }
+  .safe-bottom-padding {
+    padding-bottom: var(--safe-bottom);
+  }
+  .safe-bottom-margin {
+    margin-bottom: var(--safe-bottom);
   }
 }
 

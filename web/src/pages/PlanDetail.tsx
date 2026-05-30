@@ -101,8 +101,9 @@ export default function PlanDetail() {
   }
 
   return (
-    <div className="container-app pt-[max(env(safe-area-inset-top),8px)] pb-24">
-      <header className="flex items-center justify-between py-3">
+    <div className="container-app pb-24">
+      <div className="pt-[max(env(safe-area-inset-top),8px)]" />
+      <header className="flex items-center justify-between py-2">
         <button onClick={() => nav(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card">
           <ChevronLeft size={18} />
         </button>

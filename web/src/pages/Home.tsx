@@ -40,14 +40,15 @@ export default function Home() {
   })
 
   return (
-    <div className="container-app pt-[max(env(safe-area-inset-top),12px)]">
+    <div className="container-app pb-24">
+      <div className="pt-[max(env(safe-area-inset-top),12px)]" />
       <header className="flex items-center justify-between pt-2">
         <div>
           <div className="text-xs text-ink-500">嗨，{user?.nickname ?? '同学'} ✨</div>
           <div className="mt-0.5 text-xl font-extrabold">今天想学点什么？</div>
         </div>
         <button
-          className="grid h-10 w-10 place-items-center rounded-full bg-brand-50 text-brand-700"
+          className="grid h-9 w-9 place-items-center rounded-full bg-brand-50 text-brand-700"
           onClick={() => navigate('/mall')}
           aria-label="商城"
         >

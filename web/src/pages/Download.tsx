@@ -62,7 +62,8 @@ export default function Download() {
   const sizeMB = release ? (release.sizeBytes / 1024 / 1024).toFixed(1) : '—'
 
   return (
-    <div className="container-app pb-32 pt-[max(env(safe-area-inset-top),12px)]">
+    <div className="container-app pb-32">
+      <div className="pt-[max(env(safe-area-inset-top),12px)]" />
       <header className="flex items-center justify-between py-3">
         <button onClick={() => nav(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card">
           <ChevronLeft size={18} />

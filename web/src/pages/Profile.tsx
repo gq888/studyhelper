@@ -60,7 +60,8 @@ export default function Profile() {
   })
 
   return (
-    <div className="container-app pt-[max(env(safe-area-inset-top),8px)] pb-10">
+    <div className="container-app pb-10">
+      <div className="pt-[max(env(safe-area-inset-top),8px)]" />
       <header className="flex items-center justify-between py-2">
         <div className="text-base font-bold">个人中心</div>
         <button onClick={() => nav('/')} className="text-xs text-ink-500">

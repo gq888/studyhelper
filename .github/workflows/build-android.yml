@@ -51,6 +51,7 @@ jobs:
       - name: Build APK
         run: |
           cd web/android
+          rm -rf ~/.gradle
           chmod +x gradlew
           ./gradlew clean --no-daemon
           ./gradlew assembleDebug --no-daemon --stacktrace

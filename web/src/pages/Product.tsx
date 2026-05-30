@@ -85,7 +85,7 @@ export default function ProductPage() {
       </div>
 
       {/* 底部操作 */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 backdrop-blur md:relative md:mt-4 md:rounded-3xl md:border md:p-4 md:shadow-card">
+      <div className="fixed inset-x-0 bottom-[60px] md:bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 backdrop-blur md:relative md:mt-4 md:rounded-3xl md:border md:p-4 md:shadow-card">
         <div className="container-app flex gap-2">
           <button onClick={() => addToCart()} className="btn-ghost flex-1">
             <ShoppingCart size={16} /> 加入购物车

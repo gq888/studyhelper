@@ -98,7 +98,7 @@ export default function Cart() {
             />
           </div>
 
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 backdrop-blur">
+          <div className="fixed inset-x-0 bottom-[60px] md:bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 backdrop-blur">
             <div className="container-app flex items-center gap-3">
               <div className="flex-1">
                 <div className="text-xs text-ink-500">合计</div>

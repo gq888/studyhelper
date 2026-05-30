@@ -250,7 +250,7 @@ export default function CoursePage() {
       </div>
 
       {/* 底部操作栏 */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 backdrop-blur md:bottom-auto md:top-auto md:relative md:mt-4 md:rounded-3xl md:border md:p-4 md:shadow-card">
+      <div className="fixed inset-x-0 bottom-[60px] md:bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 backdrop-blur md:bottom-auto md:top-auto md:relative md:mt-4 md:rounded-3xl md:border md:p-4 md:shadow-card">
         <div className="container-app flex gap-2">
           <button onClick={() => setShareOpen(true)} className="btn-ghost flex-1">
             <Share2 size={16} className="hidden md:inline" /> 分享

@@ -5,16 +5,19 @@
  * - 浏览器：标准 Notification API（页面打开时才有效）
  */
 import { isNative } from '@/native'
+import { LocalNotifications } from '@capacitor/local-notifications'
 
 export type NotifyStatus = 'unknown' | 'unsupported' | 'denied' | 'granted' | 'default'
 
-export async function checkNotificationStatus(): Promise<NotifyStatus> {
+export async function checkNotificationPermission(): Promise<NotifyStatus> {
   if (isNative()) {
     try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
+      console.log('[notify] 检查本地通知权限（原生环境）')
       const perm = await LocalNotifications.checkPermissions()
+      console.log('[notify] 权限检查结果:', perm)
       return perm.display === 'granted' ? 'granted' : perm.display === 'denied' ? 'denied' : 'default'
-    } catch {
+    } catch (e) {
+      console.error('[notify] 检查权限失败:', e)
       return 'unsupported'
     }
   }
@@ -25,10 +28,12 @@ export async function checkNotificationStatus(): Promise<NotifyStatus> {
 export async function requestNotificationPermission(): Promise<NotifyStatus> {
   if (isNative()) {
     try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
-      const res = await LocalNotifications.requestPermissions()
-      return res.display === 'granted' ? 'granted' : res.display === 'denied' ? 'denied' : 'default'
-    } catch {
+      console.log('[notify] 请求本地通知权限（原生环境）')
+      const r = await LocalNotifications.requestPermissions()
+      console.log('[notify] 权限请求结果:', r)
+      return r.display === 'granted' ? 'granted' : r.display === 'denied' ? 'denied' : 'default'
+    } catch (e) {
+      console.error('[notify] 请求权限失败:', e)
       return 'unsupported'
     }
   }
@@ -50,10 +55,15 @@ export async function fireLocalNotification(args: {
 }): Promise<boolean> {
   if (isNative()) {
     try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
+      console.log('[notify] 尝试发送本地通知（原生环境）')
       const perm = await LocalNotifications.checkPermissions()
-      if (perm.display !== 'granted') return false
+      console.log('[notify] 通知权限:', perm)
+      if (perm.display !== 'granted') {
+        console.log('[notify] 权限不足，无法发送')
+        return false
+      }
       const idNum = args.id ? hashToInt(args.id) : intIdCounter++
+      console.log('[notify] 发送通知 ID:', idNum)
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -61,14 +71,16 @@ export async function fireLocalNotification(args: {
             title: args.title,
             body: args.body,
             schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
-            smallIcon: 'res://drawable/ic_launcher',
+            smallIcon: 'ic_launcher',
             channelId: 'background-tasks',
             extra: args.url ? { url: args.url } : undefined,
           },
         ],
       })
+      console.log('[notify] 通知发送成功')
       return true
-    } catch {
+    } catch (e) {
+      console.error('[notify] 发送通知失败:', e)
       return false
     }
   }

@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { isNative } from '@/native'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { LocalNotifications } from '@capacitor/local-notifications'
 
 /**
  * 学习提醒一体化 hook。
  *
  * - 原生（Capacitor）：用 @capacitor/local-notifications 调度 OS 级提醒，
- *   App 即使关闭也会推送。
+ *   App 即便关闭也会推送。
  * - 浏览器：用 Notification API + setTimeout 调度，仅在页面打开时有效。
  * - 都不可用时：showWebFallback 弹层引导用户去 /download 装 App。
  */
@@ -40,10 +41,12 @@ export function useNotifications() {
     if (native) {
       ;(async () => {
         try {
-          const { LocalNotifications } = await import('@capacitor/local-notifications')
+          console.log('[notifications] 初始化（原生环境）')
           const perm = await LocalNotifications.checkPermissions()
+          console.log('[notifications] 初始化权限检查结果:', perm)
           setStatus(perm.display === 'granted' ? 'granted' : perm.display === 'denied' ? 'denied' : 'default')
-        } catch {
+        } catch (e) {
+          console.error('[notifications] 初始化失败:', e)
           setStatus('unsupported')
         }
       })()
@@ -58,12 +61,14 @@ export function useNotifications() {
   const requestPermission = useCallback(async (): Promise<NotifyStatus> => {
     if (native) {
       try {
-        const { LocalNotifications } = await import('@capacitor/local-notifications')
-        const res = await LocalNotifications.requestPermissions()
-        const next: NotifyStatus = res.display === 'granted' ? 'granted' : res.display === 'denied' ? 'denied' : 'default'
+        console.log('[notifications] 请求权限（原生环境）')
+        const r = await LocalNotifications.requestPermissions()
+        console.log('[notifications] 请求权限结果:', r)
+        const next: NotifyStatus = r.display === 'granted' ? 'granted' : r.display === 'denied' ? 'denied' : 'default'
         setStatus(next)
         return next
-      } catch {
+      } catch (e) {
+        console.error('[notifications] 请求权限失败:', e)
         setStatus('unsupported')
         return 'unsupported'
       }
@@ -72,9 +77,9 @@ export function useNotifications() {
       setStatus('unsupported')
       return 'unsupported'
     }
-    const res = await Notification.requestPermission()
-    setStatus(res as NotifyStatus)
-    return res as NotifyStatus
+    const r = await Notification.requestPermission()
+    setStatus(r as NotifyStatus)
+    return r as NotifyStatus
   }, [native])
 
   /**
@@ -89,11 +94,13 @@ export function useNotifications() {
 
       if (native) {
         try {
-          const { LocalNotifications } = await import('@capacitor/local-notifications')
+          console.log('[notifications] 调度通知（原生环境）')
           let perm = (await LocalNotifications.checkPermissions()).display
+          console.log('[notifications] 当前权限:', perm)
           if (perm !== 'granted') {
             const r = await LocalNotifications.requestPermissions()
             perm = r.display
+            console.log('[notifications] 请求后权限:', perm)
           }
           if (perm !== 'granted') return false
           await LocalNotifications.schedule({
@@ -103,13 +110,15 @@ export function useNotifications() {
                 title: opts.title,
                 body: opts.body,
                 schedule: { at: new Date(targetAt), allowWhileIdle: true },
-                smallIcon: 'res://drawable/ic_launcher',
+                smallIcon: 'ic_launcher',
                 channelId: 'study-plan',
               },
             ],
           })
+          console.log('[notifications] 调度成功')
           return true
-        } catch {
+        } catch (e) {
+          console.error('[notifications] 调度失败:', e)
           return false
         }
       }
@@ -139,9 +148,10 @@ export function useNotifications() {
       const idNum = stableId(id)
       if (native) {
         try {
-          const { LocalNotifications } = await import('@capacitor/local-notifications')
           await LocalNotifications.cancel({ notifications: [{ id: idNum }] })
-        } catch {}
+        } catch {
+          /* ignore */
+        }
       }
       // 浏览器 setTimeout 不好取消，忽略
     },

@@ -22,6 +22,7 @@ import KbDetail from '@/pages/KbDetail'
 import Plans from '@/pages/Plans'
 import PlanDetail from '@/pages/PlanDetail'
 import Download from '@/pages/Download'
+import Debug from '@/pages/Debug'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth()
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
           <Route path="/plans/:id" element={<RequireAuth><PlanDetail /></RequireAuth>} />
           <Route path="/download" element={<Download />} />
+          <Route path="/debug" element={<Debug />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

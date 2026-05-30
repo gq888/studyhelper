@@ -32,6 +32,8 @@ web/android/local.properties
 web/android/app/release/
 *.apk
 *.aab
+# 但允许下载目录里的发布 APK 入库
+!server/public/downloads/*.apk
 *.jks
 *.keystore
 release-signing.properties

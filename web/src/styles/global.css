@@ -30,7 +30,7 @@ body {
 
 @layer components {
   .container-app {
-    @apply mx-auto w-full max-w-[480px] md:max-w-[640px] lg:max-w-3xl xl:max-w-4xl px-4;
+    @apply mx-auto w-full max-w-[480px] md:max-w-[640px] lg:max-w-3xl xl:max-w-4xl;
     padding-left: calc(1rem + var(--safe-left));
     padding-right: calc(1rem + var(--safe-right));
   }

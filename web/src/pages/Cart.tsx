@@ -44,7 +44,8 @@ export default function Cart() {
   }
 
   return (
-    <div className="container-app pb-36 pt-[max(env(safe-area-inset-top),12px)]">
+    <div className="container-app pb-36">
+      <div className="pt-[max(env(safe-area-inset-top),12px)]" />
       <header className="flex items-center justify-between py-2">
         <button onClick={() => nav(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card">
           <ChevronLeft size={18} />

@@ -76,16 +76,17 @@ export default function Debug() {
   )
 
   return (
-    <div className="p-4 h-full overflow-auto">
+    <div className="container-app pb-24 h-full overflow-auto">
+      <div className="pt-[max(env(safe-area-inset-top),12px)]" />
       <div className="flex items-center justify-between mb-4">
-        <Link to="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+        <Link to="/" className="flex items-center gap-2 text-ink-600 hover:text-ink-900">
           <ArrowLeft size={20} />
           <span>返回</span>
         </Link>
         <div className="flex gap-2">
           <button
             onClick={copyLogs}
-            className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="flex items-center gap-1 px-3 py-1 bg-brand-500 text-white rounded hover:bg-brand-600"
           >
             <Copy size={16} />
             复制

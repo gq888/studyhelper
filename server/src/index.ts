@@ -64,10 +64,22 @@ if (fs.existsSync(downloadDir)) {
 
 // 生产环境同源托管前端 SPA（如有 web/dist 则提供静态文件 + history fallback）
 const webDist = path.resolve(__dirname, '../../web/dist')
+console.log(`[server] Checking webDist path: ${webDist}, exists: ${fs.existsSync(webDist)}`)
 if (fs.existsSync(webDist)) {
-  await app.register(staticPlugin, { root: webDist, prefix: '/', wildcard: false })
+  await app.register(staticPlugin, { 
+    root: webDist, 
+    prefix: '/', 
+    wildcard: false,
+    dotfiles: 'allow',
+    etag: true,
+    lastModified: true
+  })
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api')) return reply.code(404).send({ error: 'not_found' })
+    // Check if it's an asset file before serving index.html
+    if (req.url.startsWith('/assets/') || req.url.endsWith('.js') || req.url.endsWith('.css')) {
+      return reply.code(404).send({ error: 'not_found' })
+    }
     return reply.sendFile('index.html')
   })
   console.log(`[server] Serving SPA from ${webDist}`)

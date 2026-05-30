@@ -17,6 +17,8 @@ import Product from '@/pages/Product'
 import Cart from '@/pages/Cart'
 import Orders from '@/pages/Orders'
 import Library from '@/pages/Library'
+import KbList from '@/pages/KbList'
+import KbDetail from '@/pages/KbDetail'
 import Plans from '@/pages/Plans'
 import PlanDetail from '@/pages/PlanDetail'
 import Download from '@/pages/Download'
@@ -60,6 +62,8 @@ export default function App() {
           <Route path="/cart" element={<RequireAuth><Cart /></RequireAuth>} />
           <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} />
           <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
+          <Route path="/kb" element={<RequireAuth><KbList /></RequireAuth>} />
+          <Route path="/kb/:id" element={<RequireAuth><KbDetail /></RequireAuth>} />
           <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
           <Route path="/plans/:id" element={<RequireAuth><PlanDetail /></RequireAuth>} />
           <Route path="/download" element={<Download />} />

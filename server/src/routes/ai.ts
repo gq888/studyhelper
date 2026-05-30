@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { arkChat, arkChatStream, arkJson } from '../services/ark.js'
+import { KB_TRIGGER_MIN_CHARS, buildKbForCourse, searchMultiKb } from '../services/kb.js'
 
 const EXTRACT_SYSTEM = `你是「学海小书院」的 AI 学习教练。用户会粘贴一条学习视频/链接的描述或文案，你的任务是基于该描述把内容拆解为一份**结构化学习课程大纲**。
 
@@ -104,7 +105,7 @@ export async function aiRoutes(app: FastifyInstance) {
     const parsed = z
       .object({
         sourceUrl: z.string().optional(),
-        content: z.string().min(2).max(8000),
+        content: z.string().min(2).max(40000),
         hint: z.string().max(200).optional(),
       })
       .safeParse(req.body)
@@ -142,7 +143,15 @@ export async function aiRoutes(app: FastifyInstance) {
           isPublic: true,
         },
       })
-      return { ...data, id: saved.id }
+      // 字幕够长就静默构建知识库；不 await，让用户先跳详情
+      if (content.length >= KB_TRIGGER_MIN_CHARS) {
+        setImmediate(() => {
+          buildKbForCourse(saved.id, req.userId!, content).catch((err) => {
+            app.log.error({ err }, '[kb] silent build failed')
+          })
+        })
+      }
+      return { ...data, id: saved.id, kbWillBuild: content.length >= KB_TRIGGER_MIN_CHARS }
     } catch (e: any) {
       return reply.code(500).send({ error: 'save_failed', detail: String(e?.message ?? e) })
     }
@@ -202,6 +211,38 @@ export async function aiRoutes(app: FastifyInstance) {
       }
     }
 
+    // 知识库检索：引用了课程且课程有 ready 的 KB 就根据 user message 检索 top-3 chunks
+    let kbContext = ''
+    if (allIds.length > 0) {
+      const kbs = await prisma.knowledgeBase.findMany({
+        where: { userId: req.userId!, courseId: { in: allIds }, status: 'ready' },
+        select: { id: true, title: true, courseId: true },
+      })
+      if (kbs.length > 0) {
+        try {
+          const hits = await searchMultiKb(
+            kbs.map((k) => k.id),
+            message,
+            3,
+          )
+          if (hits.length > 0) {
+            const titleMap = new Map(kbs.map((k) => [k.id, k.title]))
+            kbContext =
+              '\n\n以下是从引用课程的知识库里检索到的、与用户当前问题最相关的原文片段（按相关度降序）：\n' +
+              hits
+                .map(
+                  (h, i) =>
+                    `【片段 ${i + 1} · 来自《${titleMap.get(h.kbId) ?? ''}》 #${h.ord}】\n${h.text}`,
+                )
+                .join('\n\n') +
+              '\n\n回答时优先引用这些片段；若片段不够支撑答案，可以补充说明并提醒用户「这部分没有从视频里直接找到对应内容」。'
+          }
+        } catch {
+          /* KB 检索失败不影响对话 */
+        }
+      }
+    }
+
     // 引用学习计划
     let planContext = ''
     if (planId) {
@@ -234,7 +275,7 @@ ${itemsTxt}
     })
 
     const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-      { role: 'system', content: CHAT_SYSTEM + courseContext + planContext },
+      { role: 'system', content: CHAT_SYSTEM + courseContext + kbContext + planContext },
       ...session.messages.map((m) => ({
         role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
         content: m.content,

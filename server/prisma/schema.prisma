@@ -26,6 +26,7 @@ model User {
   achievements UserAchievement[]
   orders       Order[]
   plans        StudyPlan[]
+  knowledgeBases KnowledgeBase[]
 }
 
 // 学习课程（由用户从视频链接生成，或由系统推荐）
@@ -52,6 +53,44 @@ model Course {
   owner     User?       @relation(fields: [ownerId], references: [id])
   ratings   Rating[]
   favorites Favorite[]
+  knowledgeBases KnowledgeBase[]
+}
+
+/// 视频字幕构建出的知识库 —— 仅当字幕字数超过阈值时静默构建
+model KnowledgeBase {
+  id          String   @id @default(cuid())
+  userId      String
+  courseId    String?       // 一般 1 KB ↔ 1 Course；删 course 时设 null 保留 KB
+  title       String        // 通常取课程标题
+  description String?       // 一句话摘要（可空）
+  sourceUrl   String?       // 来源视频链接
+  totalChars  Int      @default(0)
+  chunkCount  Int      @default(0)
+  /// "building" / "ready" / "failed"
+  status      String   @default("building")
+  errorMsg    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  chunks KbChunk[]
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+model KbChunk {
+  id       String @id @default(cuid())
+  kbId     String
+  ord      Int
+  text     String      // 原文片段
+  keywords String      // 关键词（空格分隔）
+  charCount Int   @default(0)
+
+  kb KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
+
+  @@index([kbId])
 }
 
 // 真实打卡（每日/每课程）

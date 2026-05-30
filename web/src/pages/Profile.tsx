@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
+  Brain,
   CalendarCheck2,
   CalendarRange,
   ChevronRight,
@@ -178,6 +179,18 @@ export default function Profile() {
             <div className="text-left">
               <div className="text-sm font-bold">我的视频解析</div>
               <div className="text-[11px] text-ink-500">所有 AI 提取过的课程</div>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-ink-500" />
+        </button>
+        <button onClick={() => nav('/kb')} className="card mt-3 flex w-full items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <Brain size={20} />
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-bold">我的知识库</div>
+              <div className="text-[11px] text-ink-500">长视频字幕的可检索片段</div>
             </div>
           </div>
           <ChevronRight size={18} className="text-ink-500" />

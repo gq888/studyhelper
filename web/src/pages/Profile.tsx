@@ -219,18 +219,18 @@ export default function Profile() {
           </div>
           <ChevronRight size={18} className="text-ink-500" />
         </button>
-        <div className="card mt-3 flex w-full items-center justify-between p-4 opacity-80">
+        <button onClick={() => nav('/settings')} className="card mt-3 flex w-full items-center justify-between p-4">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
               <Settings size={20} />
             </div>
             <div className="text-left">
               <div className="text-sm font-bold">设置</div>
-              <div className="text-[11px] text-ink-500">通知、第三方接口</div>
+              <div className="text-[11px] text-ink-500">通知、下载 App</div>
             </div>
           </div>
           <ChevronRight size={18} className="text-ink-500" />
-        </div>
+        </button>
       </section>
     </div>
   )

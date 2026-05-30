@@ -6,13 +6,11 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   bundledWebRuntime: false,
   android: {
-    allowMixedContent: false, // 强制 https
+    allowMixedContent: true, // 允许 HTTP/HTTPS 混合
   },
   server: {
     androidScheme: 'https',
-    // 真机/模拟器调试时把下面解开并指向局域网 IP：
-    // url: 'http://192.168.0.10:5173',
-    // cleartext: true,
+    cleartext: true, // 允许 HTTP 明文请求
   },
   plugins: {
     SplashScreen: {

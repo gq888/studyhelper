@@ -32,11 +32,18 @@ jobs:
           java-version: 17
           distribution: temurin
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
       - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses" || true
           echo -e "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
           echo -e "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          echo -e "d975f751698a78e7e1c14a8a3c054e24c1f4a4e1" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
 
       - name: Build APK
         run: |

@@ -36,7 +36,7 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="container-app pb-32">
+    <div className="container-app pb-52">
       <div className="pt-[max(env(safe-area-inset-top),8px)]" />
       <header className="flex items-center justify-between py-3">
         <button onClick={() => nav(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-card">

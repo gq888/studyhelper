@@ -20,6 +20,7 @@ import { orderRoutes } from './routes/orders.js'
 import { aiRoutes } from './routes/ai.js'
 import { planRoutes } from './routes/plans.js'
 import { extractRoutes } from './routes/extract.js'
+import { downloadRoutes } from './routes/download.js'
 
 const app = Fastify({
   logger: { level: env.NODE_ENV === 'development' ? 'info' : 'warn' },
@@ -49,6 +50,17 @@ await app.register(orderRoutes, { prefix: '/api' })
 await app.register(aiRoutes, { prefix: '/api' })
 await app.register(planRoutes, { prefix: '/api' })
 await app.register(extractRoutes, { prefix: '/api' })
+await app.register(downloadRoutes)
+
+// 静态托管 APK 等下载产物（在 SPA fallback 之前注册）
+const downloadDir = path.resolve(__dirname, '../public/downloads')
+if (fs.existsSync(downloadDir)) {
+  await app.register(staticPlugin, {
+    root: downloadDir,
+    prefix: '/downloads/',
+    decorateReply: false,
+  })
+}
 
 // 生产环境同源托管前端 SPA（如有 web/dist 则提供静态文件 + history fallback）
 const webDist = path.resolve(__dirname, '../../web/dist')

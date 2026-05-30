@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
+  Bell,
+  BellRing,
   CheckCircle2,
   ChevronLeft,
   Clock3,
@@ -12,12 +14,14 @@ import {
 } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
 import { usePlanDetail, usePlan } from '@/hooks/usePlan'
+import { useNotifications } from '@/hooks/useNotifications'
 
 export default function PlanDetail() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const { data: plan, isLoading } = usePlanDetail(id)
   const { toggleItem, deleteItem, removePlan } = usePlan()
+  const notify = useNotifications()
 
   // 按日期分组
   const grouped = useMemo(() => {
@@ -45,6 +49,56 @@ export default function PlanDetail() {
   const totalMin = plan.items?.reduce((s, i) => s + i.minutes, 0) ?? 0
   const doneMin = plan.items?.filter((i) => i.done).reduce((s, i) => s + i.minutes, 0) ?? 0
   const today = new Date().toISOString().slice(0, 10)
+
+  /** 为任务日期当天早上 9 点排一条提醒 */
+  function scheduleAtFor(itemDate: string) {
+    const [y, m, d] = itemDate.split('-').map(Number)
+    return new Date(y, (m ?? 1) - 1, d ?? 1, 9, 0, 0)
+  }
+
+  async function scheduleAllReminders() {
+    if (!plan || !plan.items) return
+    const pendings = plan.items.filter((it) => !it.done && scheduleAtFor(it.date).getTime() > Date.now())
+    if (pendings.length === 0) {
+      toast('没有需要提醒的待办（或都过期了）')
+      return
+    }
+    if (notify.status === 'denied') {
+      notify.promoteAppInstall('浏览器通知权限被拒，需要装 App 才能稳定提醒')
+      return
+    }
+    let ok = 0
+    let needAppCount = 0
+    for (const it of pendings) {
+      const success = await notify.scheduleAt({
+        id: `plan-${plan.id}-item-${it.id}`,
+        at: scheduleAtFor(it.date),
+        title: `📚 该学习啦：${it.title}`,
+        body: `${it.minutes} 分钟 · 来自计划《${plan.title}》`,
+      })
+      if (success) ok++
+      else needAppCount++
+    }
+    if (ok > 0) toast.success(`已为 ${ok} 个任务安排提醒 🔔`)
+    if (needAppCount > 0 && !notify.isNative) {
+      notify.promoteAppInstall('部分提醒无法在浏览器下后台触发')
+    }
+  }
+
+  async function scheduleSingle(item: { id: string; title: string; minutes: number; date: string }) {
+    if (notify.status === 'denied') {
+      notify.promoteAppInstall('浏览器通知权限被拒，去装 App 吧')
+      return
+    }
+    const success = await notify.scheduleAt({
+      id: `plan-${plan!.id}-item-${item.id}`,
+      at: scheduleAtFor(item.date),
+      title: `📚 该学习啦：${item.title}`,
+      body: `${item.minutes} 分钟 · 来自计划《${plan!.title}》`,
+    })
+    if (success) toast.success('已开启提醒 🔔')
+    else notify.promoteAppInstall('此环境不支持后台提醒')
+  }
 
   return (
     <div className="container-app pt-[max(env(safe-area-inset-top),8px)] pb-24">
@@ -110,6 +164,23 @@ export default function PlanDetail() {
           </div>
         </div>
       )}
+
+      {/* 提醒条 */}
+      <button
+        onClick={scheduleAllReminders}
+        className="mt-4 flex w-full items-center gap-3 rounded-3xl bg-gradient-to-br from-amber-400 to-amber-500 p-3 text-left shadow-card active:scale-[0.99]"
+      >
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/20 text-white">
+          <BellRing size={18} />
+        </div>
+        <div className="flex-1 text-white">
+          <div className="text-[11px] opacity-90">
+            {notify.isNative ? '系统通知' : notify.status === 'granted' ? '浏览器通知' : '需要授权'}
+          </div>
+          <div className="text-sm font-bold leading-tight">为所有待办任务开启学习提醒</div>
+        </div>
+        <span className="text-xs font-semibold text-white/90">一键开启 →</span>
+      </button>
 
       <div className="mt-5 flex items-center gap-2 text-sm font-bold">
         <ListChecks size={16} /> 任务列表
@@ -196,7 +267,7 @@ export default function PlanDetail() {
                             const qs = new URLSearchParams({
                               planId: plan.id,
                               itemId: it.id,
-                              autoSend: `我要开始学习这个任务：${it.title}（${it.minutes} 分钟）`,
+                              autoSend: `我要开始学习这个任务:${it.title}（${it.minutes} 分钟）`,
                             })
                             const courseIds = (plan.courses ?? []).map((c) => c.id).filter(Boolean)
                             if (courseIds.length) qs.set('courseIds', courseIds.join(','))
@@ -209,6 +280,15 @@ export default function PlanDetail() {
                           {it.done ? '已掌握' : '开始学习'}
                         </button>
                       </div>
+
+                      {!it.done && (
+                        <button
+                          onClick={() => scheduleSingle({ id: it.id, title: it.title, minutes: it.minutes, date: it.date })}
+                          className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                        >
+                          <Bell size={11} /> 单独提醒我（{it.date} 09:00）
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

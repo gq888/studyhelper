@@ -6,15 +6,15 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   bundledWebRuntime: false,
   android: {
-    allowMixedContent: true, // 允许 HTTP/HTTPS 混合
+    allowMixedContent: true,
   },
   server: {
     androidScheme: 'https',
-    cleartext: true, // 允许 HTTP 明文请求
+    cleartext: true,
   },
   plugins: {
     SplashScreen: {
-      launchAutoHide: false, // 由 React 端调用 SplashScreen.hide() 时机
+      launchAutoHide: false,
       backgroundColor: '#fff7ed',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
@@ -23,6 +23,11 @@ const config: CapacitorConfig = {
     StatusBar: {
       backgroundColor: '#fb7c2d',
       style: 'LIGHT',
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_launcher',
+      iconColor: '#fb7c2d',
+      sound: 'beep.wav',
     },
   },
 }

@@ -314,7 +314,7 @@ function AIGenerateSheet({
                 }`}
               >
                 {task?.notifyOnComplete ? <Bell size={12} /> : <BellOff size={12} />}
-                {task?.notifyOnComplete ? '完成时通知已开启' : '完成时也通知我'}
+                {task?.notifyOnComplete ? '完成时通知已开启' : '继续等待，仅开启通知'}
               </button>
             </div>
           </div>

@@ -253,16 +253,16 @@ export default function CoursePage() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-brand-100/70 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 backdrop-blur md:bottom-auto md:top-auto md:relative md:mt-4 md:rounded-3xl md:border md:p-4 md:shadow-card">
         <div className="container-app flex gap-2">
           <button onClick={() => setShareOpen(true)} className="btn-ghost flex-1">
-            <Share2 size={16} /> 分享
+            <Share2 size={16} className="hidden md:inline" /> 分享
           </button>
           <button onClick={() => setPlanSheetOpen(true)} className="btn-ghost flex-1">
-            <CalendarPlus size={16} /> 加入计划
+            <CalendarPlus size={16} className="hidden md:inline" /> 加入计划
           </button>
           <button onClick={() => checkin.mutate()} className="btn-ghost flex-1">
-            <CalendarCheck2 size={16} /> 打卡
+            <CalendarCheck2 size={16} className="hidden md:inline" /> 打卡
           </button>
           <button onClick={() => nav(`/chat?courseId=${c.id}`)} className="btn-primary flex-1">
-            <MessageCircle size={16} /> 陪学
+            <MessageCircle size={16} className="hidden md:inline" /> 陪学
           </button>
         </div>
         <div className="mt-2 text-center text-[11px] text-ink-500 md:hidden">

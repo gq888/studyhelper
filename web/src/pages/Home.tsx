@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Link2, Sparkles, ShoppingBag, ArrowRight, BookOpen, Trophy, CalendarRange, Library as LibraryIcon } from 'lucide-react'
+import { ArrowRight, BookOpen, CalendarRange, Library as LibraryIcon, Link2, Search, ShoppingBag, Sparkles, Trophy, Video } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
+import { VideoSearchSheet } from '@/components/VideoSearchSheet'
 import { api } from '@/api/client'
 import { useAuth } from '@/store/auth'
 
@@ -33,6 +35,8 @@ export default function Home() {
     const u = new URL(window.location.href)
     return [u.searchParams.get('cat') || 'all', () => {}]
   })()
+  // 视频搜索 sheet：非空字符串 = 打开
+  const [videoSearchKeyword, setVideoSearchKeyword] = useState<string | null>(null)
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ['courses', cat],
@@ -68,6 +72,26 @@ export default function Home() {
           <div>
             <div className="text-sm font-semibold text-white/85">粘贴一条视频/课程链接</div>
             <div className="text-base font-extrabold text-white">AI 立刻提取学习大纲</div>
+          </div>
+        </div>
+        <ArrowRight className="text-white" />
+      </button>
+
+      {/* 搜索视频入口 —— 没有现成链接时的兜底 */}
+      <button
+        onClick={() => setVideoSearchKeyword('')}
+        className="mt-3 flex w-full items-center justify-between gap-3 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 p-4 text-left shadow-card transition active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative grid h-12 w-12 place-items-center rounded-2xl bg-white/20 text-white">
+            <Video size={22} />
+            <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-white text-amber-600 shadow">
+              <Search size={11} strokeWidth={3} />
+            </span>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-white/85">没有现成链接？</div>
+            <div className="text-base font-extrabold text-white">搜索想学的视频 · 一键批量解析</div>
           </div>
         </div>
         <ArrowRight className="text-white" />
@@ -173,6 +197,12 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      <VideoSearchSheet
+        open={videoSearchKeyword !== null}
+        onClose={() => setVideoSearchKeyword(null)}
+        initialQuery={videoSearchKeyword ?? ''}
+      />
     </div>
   )
 }

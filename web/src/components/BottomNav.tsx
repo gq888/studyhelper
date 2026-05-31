@@ -39,7 +39,7 @@ export function SideNav() {
     <aside className="sticky top-0 hidden h-screen w-56 flex-col gap-1 border-r border-brand-100/60 bg-white/70 px-4 py-6 md:flex">
       <div className="mb-6 flex items-center gap-2 px-2">
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500 text-white">
-          🐼
+          🦉
         </div>
         <div>
           <div className="text-base font-bold leading-none">学海小书院</div>

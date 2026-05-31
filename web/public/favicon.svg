@@ -1,14 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <rect width="200" height="200" rx="40" fill="#fb7c2d"/>
-  <ellipse cx="100" cy="115" rx="60" ry="55" fill="#fff"/>
-  <ellipse cx="50" cy="68" rx="14" ry="16" fill="#1f1d1c"/>
-  <ellipse cx="150" cy="68" rx="14" ry="16" fill="#1f1d1c"/>
-  <ellipse cx="76" cy="108" rx="14" ry="18" fill="#1f1d1c" transform="rotate(-8 76 108)"/>
-  <ellipse cx="124" cy="108" rx="14" ry="18" fill="#1f1d1c" transform="rotate(8 124 108)"/>
-  <circle cx="78" cy="110" r="4" fill="#fff"/>
-  <circle cx="122" cy="110" r="4" fill="#fff"/>
-  <ellipse cx="100" cy="128" rx="6" ry="4" fill="#1f1d1c"/>
-  <path d="M 92 138 Q 100 144 108 138" stroke="#1f1d1c" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- 身体 -->
+  <ellipse cx="100" cy="120" rx="62" ry="58" fill="#a98064" stroke="#1f1d1c" stroke-width="3"/>
+  <ellipse cx="100" cy="130" rx="42" ry="44" fill="#fde7c0"/>
+  <!-- 翅膀 -->
+  <path d="M 48 110 Q 36 130 50 162 Q 60 152 64 130 Z" fill="#8a6047" stroke="#1f1d1c" stroke-width="2"/>
+  <path d="M 152 110 Q 164 130 150 162 Q 140 152 136 130 Z" fill="#8a6047" stroke="#1f1d1c" stroke-width="2"/>
+  <!-- 羽冠 -->
+  <path d="M 70 70 L 76 56 L 84 72 Z" fill="#a98064" stroke="#1f1d1c" stroke-width="2"/>
+  <path d="M 130 70 L 124 56 L 116 72 Z" fill="#a98064" stroke="#1f1d1c" stroke-width="2"/>
+  <!-- 眼盘 -->
+  <ellipse cx="76" cy="98" rx="24" ry="26" fill="#fff8ec" stroke="#1f1d1c" stroke-width="2.5"/>
+  <ellipse cx="124" cy="98" rx="24" ry="26" fill="#fff8ec" stroke="#1f1d1c" stroke-width="2.5"/>
+  <circle cx="76" cy="98" r="12" fill="#1f1d1c"/>
+  <circle cx="124" cy="98" r="12" fill="#1f1d1c"/>
+  <circle cx="80" cy="93" r="4" fill="#fff"/>
+  <circle cx="128" cy="93" r="4" fill="#fff"/>
+  <!-- 喙 -->
+  <path d="M 92 116 L 100 128 L 108 116 Z" fill="#f97316" stroke="#1f1d1c" stroke-width="2"/>
+  <!-- 学士帽 -->
   <rect x="58" y="34" width="84" height="6" rx="2" fill="#1f1d1c"/>
   <polygon points="100,16 142,30 100,44 58,30" fill="#1f1d1c"/>
 </svg>

@@ -38,7 +38,7 @@ export function PlanPicker({ open, onClose, selectedId, onChange }: Props) {
           </button>
         </div>
         <p className="text-xs text-ink-500">
-          最多同时引用 1 个计划。书院熊会拿到完整任务清单作为答疑上下文。
+          最多同时引用 1 个计划。书院鸮会拿到完整任务清单作为答疑上下文。
         </p>
 
         {selectedId && (

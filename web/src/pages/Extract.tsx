@@ -267,7 +267,7 @@ function BusyView({
     <div className="flex flex-col items-center py-8">
       <Mascot size={140} mood={isSubtitle ? 'thinking' : 'reading'} bobbing />
       <div className="mt-4 text-base font-bold">
-        {isSubtitle ? '正在提取视频字幕…' : '书院熊正在整理学习大纲…'}
+        {isSubtitle ? '正在提取视频字幕…' : '书院鸮正在整理学习大纲…'}
       </div>
       <div className="mt-1 h-5 text-xs text-ink-500">{task.stageLabel}</div>
 

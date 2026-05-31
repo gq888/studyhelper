@@ -282,7 +282,7 @@ function AIGenerateSheet({
         {generating ? (
           <div className="flex flex-col items-center py-2">
             <Mascot size={108} mood="reading" bobbing />
-            <div className="mt-3 text-base font-bold">书院熊正在为你排期…</div>
+            <div className="mt-3 text-base font-bold">书院鸮正在为你排期…</div>
             <div className="mt-1 h-5 text-xs text-ink-500">{stageLabel}</div>
             <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-brand-100">
               <motion.div
@@ -321,7 +321,7 @@ function AIGenerateSheet({
         ) : (
           <>
             <div className="text-base font-bold">✨ AI 生成学习计划</div>
-            <p className="mt-1 text-xs text-ink-500">告诉书院熊你的目标，它会安排好每一天。</p>
+            <p className="mt-1 text-xs text-ink-500">告诉书院鸮你的目标，它会安排好每一天。</p>
 
             {initialCourse && (
               <div className="mt-3 flex items-center gap-2 rounded-2xl bg-brand-50 p-2.5 text-xs">

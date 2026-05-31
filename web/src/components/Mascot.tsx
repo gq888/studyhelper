@@ -7,7 +7,8 @@ interface MascotProps {
 }
 
 /**
- * 「书院熊」吉祥物 - 内嵌 SVG，避免外部图片依赖
+ * 「书院鸮」吉祥物 - 内嵌 SVG（猫头鹰），避免外部图片依赖。
+ * 配色：棕褐身体 + 米黄胸腹 + 橙喙 + 学士帽。
  */
 export function Mascot({ size = 96, mood = 'happy', bobbing = false }: MascotProps) {
   const Body = (
@@ -19,28 +20,38 @@ export function Mascot({ size = 96, mood = 'happy', bobbing = false }: MascotPro
         <line x1="115" y1="14" x2="125" y2="40" stroke="#3a3735" strokeWidth="3" />
         <circle cx="125" cy="42" r="5" fill="#f97316" />
       </g>
-      {/* 头 */}
-      <ellipse cx="100" cy="105" rx="62" ry="58" fill="#fff" stroke="#1f1d1c" strokeWidth="3" />
-      {/* 耳朵 */}
-      <ellipse cx="48" cy="58" rx="16" ry="18" fill="#1f1d1c" />
-      <ellipse cx="152" cy="58" rx="16" ry="18" fill="#1f1d1c" />
-      <ellipse cx="48" cy="60" rx="9" ry="11" fill="#3a3735" />
-      <ellipse cx="152" cy="60" rx="9" ry="11" fill="#3a3735" />
-      {/* 眼周 */}
-      <ellipse cx="74" cy="98" rx="16" ry="20" fill="#1f1d1c" transform="rotate(-8 74 98)" />
-      <ellipse cx="126" cy="98" rx="16" ry="20" fill="#1f1d1c" transform="rotate(8 126 98)" />
-      {/* 眼睛高光 */}
-      <circle cx="76" cy="99" r="5" fill="#fff" />
-      <circle cx="124" cy="99" r="5" fill="#fff" />
-      <circle cx="78" cy="100" r="1.6" fill="#1f1d1c" />
-      <circle cx="122" cy="100" r="1.6" fill="#1f1d1c" />
-      {/* 鼻子 */}
-      <ellipse cx="100" cy="118" rx="6" ry="4" fill="#1f1d1c" />
-      {/* 嘴 */}
-      <path d="M 92 128 Q 100 135 108 128" stroke="#1f1d1c" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      {/* 身体（圆胖椭圆） */}
+      <ellipse cx="100" cy="118" rx="62" ry="60" fill="#a98064" stroke="#1f1d1c" strokeWidth="3" />
+      {/* 胸腹米黄色面板（猫头鹰特征） */}
+      <ellipse cx="100" cy="128" rx="42" ry="46" fill="#fde7c0" />
+      {/* 胸腹纹理：几道短弧 */}
+      <path d="M 80 140 Q 100 134 120 140" stroke="#caa676" strokeWidth="1.6" fill="none" />
+      <path d="M 78 152 Q 100 146 122 152" stroke="#caa676" strokeWidth="1.6" fill="none" />
+      <path d="M 82 162 Q 100 156 118 162" stroke="#caa676" strokeWidth="1.6" fill="none" />
+      {/* 翅膀（左右两片） */}
+      <path d="M 44 110 Q 30 130 48 162 Q 60 152 64 130 Z" fill="#8a6047" stroke="#1f1d1c" strokeWidth="2.4" />
+      <path d="M 156 110 Q 170 130 152 162 Q 140 152 136 130 Z" fill="#8a6047" stroke="#1f1d1c" strokeWidth="2.4" />
+      {/* 头部羽冠（两个小尖） */}
+      <path d="M 64 64 L 70 50 L 78 66 Z" fill="#a98064" stroke="#1f1d1c" strokeWidth="2.4" />
+      <path d="M 136 64 L 130 50 L 122 66 Z" fill="#a98064" stroke="#1f1d1c" strokeWidth="2.4" />
+      {/* 眼盘（猫头鹰特有的圆盘脸） */}
+      <ellipse cx="74" cy="92" rx="26" ry="28" fill="#fff8ec" stroke="#1f1d1c" strokeWidth="2.6" />
+      <ellipse cx="126" cy="92" rx="26" ry="28" fill="#fff8ec" stroke="#1f1d1c" strokeWidth="2.6" />
+      {/* 眼睛（大黑圆 + 高光） */}
+      <circle cx="74" cy="92" r="13" fill="#1f1d1c" />
+      <circle cx="126" cy="92" r="13" fill="#1f1d1c" />
+      <circle cx="79" cy="87" r="4" fill="#fff" />
+      <circle cx="131" cy="87" r="4" fill="#fff" />
+      <circle cx="71" cy="96" r="1.6" fill="#fff" />
+      <circle cx="123" cy="96" r="1.6" fill="#fff" />
+      {/* 喙（V 形橙色） */}
+      <path d="M 92 112 L 100 124 L 108 112 Z" fill="#f97316" stroke="#1f1d1c" strokeWidth="2" strokeLinejoin="round" />
       {/* 腮红 */}
-      <circle cx="62" cy="125" r="7" fill="#fdba74" opacity="0.55" />
-      <circle cx="138" cy="125" r="7" fill="#fdba74" opacity="0.55" />
+      <circle cx="56" cy="118" r="6" fill="#fdba74" opacity="0.6" />
+      <circle cx="144" cy="118" r="6" fill="#fdba74" opacity="0.6" />
+      {/* 两只小脚 */}
+      <path d="M 84 174 L 84 182 M 80 182 L 88 182" stroke="#f97316" strokeWidth="3" strokeLinecap="round" />
+      <path d="M 116 174 L 116 182 M 112 182 L 120 182" stroke="#f97316" strokeWidth="3" strokeLinecap="round" />
       {/* 道具：读书 / 思考 */}
       {mood === 'reading' && (
         <g transform="translate(60,148)">
@@ -54,9 +65,9 @@ export function Mascot({ size = 96, mood = 'happy', bobbing = false }: MascotPro
       )}
       {mood === 'thinking' && (
         <g>
-          <circle cx="158" cy="56" r="6" fill="#fffdf8" stroke="#1f1d1c" strokeWidth="2" />
-          <circle cx="170" cy="44" r="9" fill="#fffdf8" stroke="#1f1d1c" strokeWidth="2" />
-          <text x="166" y="48" fontSize="12" fill="#1f1d1c" fontWeight="bold">?</text>
+          <circle cx="160" cy="56" r="6" fill="#fffdf8" stroke="#1f1d1c" strokeWidth="2" />
+          <circle cx="172" cy="44" r="9" fill="#fffdf8" stroke="#1f1d1c" strokeWidth="2" />
+          <text x="168" y="48" fontSize="12" fill="#1f1d1c" fontWeight="bold">?</text>
         </g>
       )}
     </svg>

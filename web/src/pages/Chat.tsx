@@ -251,7 +251,7 @@ export default function Chat() {
             title: r.title,
             minutes: r.minutes,
             courseId: r.courseId,
-            note: '由书院熊根据考核结果添加的复习任务',
+            note: '由书院鸮根据考核结果添加的复习任务',
           },
         })
         touched = true
@@ -394,7 +394,7 @@ export default function Chat() {
             <Mascot size={28} mood="happy" />
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="line-clamp-1 text-sm font-bold">书院熊 · 学习陪伴</div>
+            <div className="line-clamp-1 text-sm font-bold">书院鸮 · 学习陪伴</div>
             <div className="text-[10px] text-ink-500">doubao-seed-2.0-pro 实时生成</div>
           </div>
         </div>
@@ -442,7 +442,7 @@ export default function Chat() {
           {messages.length === 0 && !streamingId && (
             <div className="flex flex-col items-center py-10 text-center">
               <Mascot size={120} mood="reading" bobbing />
-              <div className="mt-3 text-sm font-semibold">嗨～我是书院熊 🐼</div>
+              <div className="mt-3 text-sm font-semibold">嗨～我是书院鸮 🦉</div>
               <div className="mt-1 text-xs text-ink-500">告诉我你在学什么，我陪你一步步推进。</div>
             </div>
           )}
@@ -529,7 +529,7 @@ export default function Chat() {
 
           {streamingId && (
             <div className="mb-3 ml-11 inline-flex items-center gap-1 rounded-2xl bg-white px-3 py-2 text-xs text-ink-500 shadow-card">
-              <Sparkles size={12} className="animate-pulse text-brand-500" /> 书院熊正在思考…
+              <Sparkles size={12} className="animate-pulse text-brand-500" /> 书院鸮正在思考…
             </div>
           )}
         </div>

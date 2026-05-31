@@ -113,7 +113,7 @@ const SUBTITLE_STEPS = [
   '📜 整理 SRT 字幕…',
 ]
 const OUTLINE_STEPS = [
-  '🧠 书院熊在阅读字幕…',
+  '🧠 书院鸮在阅读字幕…',
   '🎯 提炼学习目标…',
   '📚 拆解章节大纲…',
   '💡 准备学习 tips…',

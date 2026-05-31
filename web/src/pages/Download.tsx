@@ -34,7 +34,7 @@ function isMobileUA() {
 const FEATURES = [
   { icon: Bell, title: '稳定的学习提醒', desc: '到点 OS 级通知，不再错过任务' },
   { icon: Timer, title: '后台番茄钟', desc: '锁屏倒计时，更专注' },
-  { icon: Sparkles, title: '随时与书院熊对话', desc: '主屏一键直达，告别浏览器跳转' },
+  { icon: Sparkles, title: '随时与书院鸮对话', desc: '主屏一键直达，告别浏览器跳转' },
   { icon: ShieldCheck, title: '本地隐私优先', desc: '打卡热力图直接存设备' },
 ]
 

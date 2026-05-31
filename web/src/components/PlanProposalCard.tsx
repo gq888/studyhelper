@@ -128,7 +128,7 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
       <div className="space-y-2 rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-3 shadow-card">
         <div className="flex items-center gap-2 text-sm font-bold text-brand-700">
           <Sparkles size={15} className="animate-pulse" />
-          书院熊正在排期…
+          书院鸮正在排期…
         </div>
         <div className="h-[18px] text-[11px] text-ink-500">{stageLabel}</div>
         <div className="h-2 overflow-hidden rounded-full bg-brand-100">
@@ -174,7 +174,7 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
         </div>
         <div className="line-clamp-2 text-xs text-ink-700">《{createdPlan.title}》</div>
         <p className="text-[11px] text-ink-500">
-          接下来问书院熊关于这个计划的任何问题，它都拿得到完整任务清单。
+          接下来问书院鸮关于这个计划的任何问题，它都拿得到完整任务清单。
         </p>
         <button
           onClick={() => nav(`/plans/${createdPlan.id}`)}
@@ -193,7 +193,7 @@ export function PlanProposalCard({ proposal, onCreated, historical = false }: Pr
           <CalendarRange size={16} />
         </div>
         <div className="flex-1 leading-tight">
-          <div className="text-[11px] text-brand-700">书院熊建议</div>
+          <div className="text-[11px] text-brand-700">书院鸮建议</div>
           <div className="text-sm font-bold text-ink-900">AI 学习计划草稿</div>
         </div>
       </div>

@@ -98,7 +98,7 @@ export default function Home() {
           </div>
           <div className="text-left">
             <div className="text-xs text-ink-500">AI 陪学</div>
-            <div className="text-sm font-bold">和书院熊聊聊</div>
+            <div className="text-sm font-bold">和书院鸮聊聊</div>
           </div>
         </button>
         <button onClick={() => navigate('/me')} className="flex items-center gap-2 rounded-2xl bg-white p-3 shadow-card">

@@ -194,7 +194,7 @@ export default function PlanDetail() {
           }}
           className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600"
         >
-          <MessageCircle size={12} /> 让书院熊答疑
+          <MessageCircle size={12} /> 让书院鸮答疑
         </button>
       </div>
 

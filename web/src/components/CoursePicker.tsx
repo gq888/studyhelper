@@ -36,7 +36,7 @@ export function CoursePicker({ open, onClose, selectedIds, onChange }: Props) {
             <X size={16} />
           </button>
         </div>
-        <p className="text-xs text-ink-500">把课程大纲附加到本次对话，书院熊回答会更精准。</p>
+        <p className="text-xs text-ink-500">把课程大纲附加到本次对话，书院鸮回答会更精准。</p>
         <div className="mt-3 max-h-72 space-y-1.5 overflow-y-auto">
           {courses.length === 0 && (
             <div className="rounded-xl border-2 border-dashed border-brand-100 p-5 text-center text-xs text-ink-500">

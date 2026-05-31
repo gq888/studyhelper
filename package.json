@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.0.1",
-    "marked": "^18.0.4"
+    "marked": "^18.0.4",
+    "puppeteer-core": "^25.1.0"
   }
 }

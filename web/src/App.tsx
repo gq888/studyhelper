@@ -1,9 +1,13 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import { useAuth } from '@/store/auth'
 import { BottomNav, SideNav } from '@/components/BottomNav'
 import { BackgroundTaskFloater } from '@/components/BackgroundTaskFloater'
+import { ClipboardLinkPrompt } from '@/components/ClipboardLinkPrompt'
 import { InstallAppConfirm } from '@/components/InstallAppConfirm'
+import { useClipboardLink, type ClipboardHit } from '@/hooks/useClipboardLink'
+import { startVideoExtract } from '@/store/bgTasks'
 import Splash from '@/pages/Splash'
 import Login from '@/pages/Login'
 import Home from '@/pages/Home'
@@ -77,6 +81,40 @@ export default function App() {
       <BottomNav />
       <BackgroundTaskFloater />
       <InstallAppConfirm />
+      <ClipboardLinkWatcher />
     </div>
+  )
+}
+
+/**
+ * 全局剪贴板链接监测：仅在已登录时启用。
+ * - 检测到链接 → 弹出提示卡
+ * - 用户点「立即解析」→ 走 bgTasks 后台流水线，浮窗显示进度
+ * - 用户点「忽略」→ 记入 dismissed 列表，24h 内同 URL 不再打扰
+ */
+function ClipboardLinkWatcher() {
+  const { token } = useAuth()
+  const [hit, setHit] = useState<ClipboardHit | null>(null)
+  const { dismiss } = useClipboardLink((h) => {
+    // 未登录时静默：避免在 Login 页弹出
+    if (!token) return
+    setHit(h)
+  })
+
+  return (
+    <ClipboardLinkPrompt
+      hit={hit}
+      onClose={() => {
+        if (hit) dismiss(hit.url)
+        setHit(null)
+      }}
+      onParse={(h) => {
+        startVideoExtract({ url: h.url, notifyOnComplete: false })
+        toast.success('已加入后台解析，右下角浮窗看进度 ✨')
+        // 解析过的就视作已处理，不再重提
+        dismiss(h.url)
+        setHit(null)
+      }}
+    />
   )
 }

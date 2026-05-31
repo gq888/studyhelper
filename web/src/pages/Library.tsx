@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ChevronLeft, Clock3, Heart, Link2, Search, Sparkles, Star, Trash2 } from 'lucide-react'
+import { ChevronLeft, Clock3, Heart, Link2, Search, Sparkles, Star, Trash2, Video } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
+import { VideoSearchSheet } from '@/components/VideoSearchSheet'
 import { api } from '@/api/client'
 
 interface Course {
@@ -105,6 +106,8 @@ export default function Library() {
 
   const tabMeta = TABS.find((t) => t.code === tab)!
 
+  const [videoSearchKeyword, setVideoSearchKeyword] = useState<string | null>(null)
+
   return (
     <div className="container-app pb-24">
       <div className="pt-[max(env(safe-area-inset-top),12px)]" />
@@ -166,7 +169,21 @@ export default function Library() {
         ))}
       </div>
 
-      <div className="mt-3 text-xs text-ink-500">共 {filtered.length} 门{tabMeta.label.replace('我的', '').replace('我已', '').trim() || '课程'}</div>
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink-500">
+        <span>
+          共 {filtered.length} 门{tabMeta.label.replace('我的', '').replace('我已', '').trim() || '课程'}
+        </span>
+        {tab === 'mine' && (
+          <button
+            type="button"
+            onClick={() => setVideoSearchKeyword(search.trim() || '')}
+            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition active:scale-95"
+            title="除了这里列出的，还可以搜索新的视频去解析"
+          >
+            <Video size={11} /> 搜索更多视频
+          </button>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="mt-3 space-y-2">
@@ -178,10 +195,20 @@ export default function Library() {
           <div className="mt-3 text-sm font-semibold">{search ? '没有匹配的课程' : tabMeta.empty}</div>
           {!search && tab === 'mine' && (
             <>
-              <div className="mt-1 text-xs text-ink-500">去粘贴一条视频链接试试 →</div>
-              <button onClick={() => nav('/extract')} className="btn-primary mt-4">
-                <Link2 size={14} /> 立即解析
-              </button>
+              <div className="mt-1 text-xs text-ink-500">
+                可以粘贴链接、或直接搜索一段学习视频来解析
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button onClick={() => nav('/extract')} className="btn-primary">
+                  <Link2 size={14} /> 粘贴链接
+                </button>
+                <button
+                  onClick={() => setVideoSearchKeyword('')}
+                  className="btn-ghost"
+                >
+                  <Video size={14} /> 搜索视频
+                </button>
+              </div>
             </>
           )}
           {!search && tab === 'fav' && (
@@ -228,6 +255,12 @@ export default function Library() {
           ))}
         </div>
       )}
+
+      <VideoSearchSheet
+        open={videoSearchKeyword !== null}
+        onClose={() => setVideoSearchKeyword(null)}
+        initialQuery={videoSearchKeyword ?? ''}
+      />
     </div>
   )
 }

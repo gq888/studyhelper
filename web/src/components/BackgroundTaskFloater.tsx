@@ -24,8 +24,8 @@ export function BackgroundTaskFloater() {
       {/* 圆形浮动按钮 */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-[max(env(safe-area-inset-bottom),16px)] right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-brand-500 text-white shadow-xl shadow-brand-500/40 transition active:scale-95 md:bottom-6 md:right-6 md:h-14 md:w-14"
-        style={{ marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)' }} // 让位底部 nav
+        // 移动端 bottom = BottomNav 高度 + 16px；桌面端 var=0，由 md:bottom-6 覆盖到 24px
+        className="fixed bottom-[calc(var(--bottom-nav-h)+16px)] right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-brand-500 text-white shadow-xl shadow-brand-500/40 transition active:scale-95 md:bottom-6 md:right-6 md:h-14 md:w-14"
       >
         {running.length > 0 ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={22} />}
         {tasks.length > 0 && (

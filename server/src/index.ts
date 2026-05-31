@@ -22,6 +22,7 @@ import { planRoutes } from './routes/plans.js'
 import { extractRoutes } from './routes/extract.js'
 import { downloadRoutes } from './routes/download.js'
 import { kbRoutes } from './routes/kb.js'
+import { searchRoutes } from './routes/search.js'
 
 const app = Fastify({
   logger: { level: env.NODE_ENV === 'development' ? 'info' : 'warn' },
@@ -52,6 +53,7 @@ await app.register(aiRoutes, { prefix: '/api' })
 await app.register(planRoutes, { prefix: '/api' })
 await app.register(extractRoutes, { prefix: '/api' })
 await app.register(kbRoutes, { prefix: '/api' })
+await app.register(searchRoutes, { prefix: '/api' })
 await app.register(downloadRoutes)
 
 // 静态托管 APK 等下载产物（在 SPA fallback 之前注册）

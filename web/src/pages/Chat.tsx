@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ChevronLeft, History, Paperclip, Plus, Send, Sparkles, X } from 'lucide-react'
+import { ChevronLeft, History, Paperclip, Plus, Search, Send, Sparkles, Video, X } from 'lucide-react'
 import { Mascot } from '@/components/Mascot'
 import { PomoTimer } from '@/components/Timer'
 import { ChatSessionsDrawer } from '@/components/ChatSessionsDrawer'
 import { CoursePicker } from '@/components/CoursePicker'
 import { PlanPicker } from '@/components/PlanPicker'
 import { PlanProposalCard } from '@/components/PlanProposalCard'
+import { VideoSearchSheet } from '@/components/VideoSearchSheet'
+import { useBgTasks } from '@/store/bgTasks'
 import { api, aiStream } from '@/api/client'
 
 interface Message {
@@ -70,6 +72,7 @@ type AssistantTag =
       date: string
       courseId?: string
     }
+  | { kind: 'video_search'; key: string; keyword: string; reason?: string }
 
 /** 一次性提取消息里所有标记，并返回剥离所有标记后的纯文本 */
 function extractAllTags(content: string): { tags: AssistantTag[]; clean: string } {
@@ -109,12 +112,49 @@ function extractAllTags(content: string): { tags: AssistantTag[]; clean: string 
     })
   }
 
+  // <<VIDEO_SEARCH:关键词>>
+  // <<VIDEO_SEARCH:关键词|reason=简短理由>>
+  // <<VIDEO_SEARCH:keyword=反向传播|reason=...>>  ← 兜底兼容 AI 把第一段也写成 KV
+  for (const m of content.matchAll(/<<VIDEO_SEARCH:([^>]+)>>/g)) {
+    const raw = m[1].trim()
+    const parts = raw.split('|').map((s) => s.trim())
+    const head = parts[0] ?? ''
+    const kvRest = parts.slice(1)
+    // 解析 KV 段
+    const kv: Record<string, string> = {}
+    for (const piece of kvRest) {
+      const i = piece.indexOf('=')
+      if (i > 0) kv[piece.slice(0, i).trim()] = piece.slice(i + 1).trim()
+    }
+    // keyword 取规则：第一段不含 = 时就是 keyword；否则从 KV 里取 keyword / q
+    let keyword = ''
+    if (head && !head.includes('=')) {
+      keyword = head
+    } else {
+      // 第一段是 KV 的情况：head 也要参与 KV 合并
+      if (head.includes('=')) {
+        const i = head.indexOf('=')
+        kv[head.slice(0, i).trim()] = head.slice(i + 1).trim()
+      }
+      keyword = (kv.keyword || kv.q || '').trim()
+    }
+    if (keyword) {
+      tags.push({
+        kind: 'video_search',
+        key: `vs-${idx++}`,
+        keyword,
+        reason: kv.reason?.trim() || undefined,
+      })
+    }
+  }
+
   // 一次性剥离所有标记
   clean = clean
     .replace(/<<TIMER:[^>]+>>/g, '')
     .replace(/<<PLAN:[^>]+>>/g, '')
     .replace(/<<TASK_DONE:[^>]+>>/g, '')
     .replace(/<<TASK_REVIEW:[^>]+>>/g, '')
+    .replace(/<<VIDEO_SEARCH:[^>]+>>/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
@@ -143,6 +183,14 @@ export default function Chat() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [planPickerOpen, setPlanPickerOpen] = useState(false)
+  // 视频搜索 sheet 的预填关键词：非空字符串 = 打开；null = 关闭
+  const [videoSearchKeyword, setVideoSearchKeyword] = useState<string | null>(null)
+  /**
+   * 视频搜索 → 批量解析提交后，挂载在这里的一组 BgTask id。
+   * 每个任务完成时，自动把生成的 courseId 加入当前对话的 citedCourseIds，
+   * 这样 AI 下一轮回答就能基于这些刚解析出的素材。
+   */
+  const pendingVideoExtractIdsRef = useRef<Set<string>>(new Set())
   const [citedCourseIds, setCitedCourseIds] = useState<string[]>(() => {
     const acc = new Set<string>()
     if (initialCourseId) acc.add(initialCourseId)
@@ -325,6 +373,32 @@ export default function Chat() {
     })
   }, [streamingText, streamingId])
 
+  /**
+   * 订阅 bgTasks store：用户从 VIDEO_SEARCH 卡片或 Library 入口提交的视频解析任务
+   * 一旦完成，自动把生成的 courseId 加入当前对话的引用，并 toast 提示。
+   */
+  useEffect(() => {
+    const unsub = useBgTasks.subscribe((state) => {
+      if (pendingVideoExtractIdsRef.current.size === 0) return
+      for (const id of Array.from(pendingVideoExtractIdsRef.current)) {
+        const t = state.tasks.find((x) => x.id === id)
+        if (!t) continue
+        if (t.stage === 'done' && t.result?.id) {
+          const newCourseId: string = t.result.id
+          const title: string = t.result.title ?? '新解析的视频'
+          setCitedCourseIds((prev) =>
+            prev.includes(newCourseId) ? prev : [...prev, newCourseId],
+          )
+          toast.success(`已自动引用《${String(title).slice(0, 18)}》到当前对话 ✨`)
+          pendingVideoExtractIdsRef.current.delete(id)
+        } else if (t.stage === 'error' || t.stage === 'cancelled') {
+          pendingVideoExtractIdsRef.current.delete(id)
+        }
+      }
+    })
+    return unsub
+  }, [])
+
   useEffect(() => {
     if (!streamingId && streamingText) {
       setMessages((m) => {
@@ -374,7 +448,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col">
+    <div className="flex h-[calc(100dvh-var(--bottom-nav-h))] flex-col">
       <header className="flex items-center justify-between gap-2 border-b border-brand-100/60 bg-white/95 px-3 py-3 backdrop-blur">
         <button
           onClick={() => setDrawerOpen(true)}
@@ -520,6 +594,36 @@ export default function Chat() {
                         </div>
                       )
                     }
+                    if (tag.kind === 'video_search') {
+                      return (
+                        <button
+                          key={tag.key}
+                          type="button"
+                          onClick={() => setVideoSearchKeyword(tag.keyword)}
+                          className="group flex w-full items-start gap-2.5 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-3 text-left shadow-card transition active:scale-[0.99] hover:border-amber-300"
+                        >
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-amber-600">
+                            <Video size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1 leading-tight">
+                            <div className="flex items-center gap-1 text-[12px] font-bold text-amber-800">
+                              📚 帮你扩充知识库
+                            </div>
+                            <div className="mt-0.5 line-clamp-3 text-[11px] text-ink-700">
+                              {tag.reason
+                                ? `${tag.reason} —— 勾选视频后我会自动解析、加入你的知识库，并把它引用到当前对话，下一次提问就能基于这些内容回答你。`
+                                : '勾选你感兴趣的视频，我会自动提取字幕生成课程并加入知识库，引用到这次对话里，之后就能用这些素材帮你深入解答。'}
+                            </div>
+                            <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                              <Search size={10} /> {tag.keyword}
+                            </div>
+                          </div>
+                          <span className="self-center whitespace-nowrap text-[10px] font-semibold text-amber-700">
+                            选视频 →
+                          </span>
+                        </button>
+                      )
+                    }
                     return null
                   })}
                 </div>
@@ -624,6 +728,15 @@ export default function Chat() {
         onClose={() => setPlanPickerOpen(false)}
         selectedId={citedPlanId}
         onChange={setCitedPlanId}
+      />
+      <VideoSearchSheet
+        open={videoSearchKeyword !== null}
+        onClose={() => setVideoSearchKeyword(null)}
+        initialQuery={videoSearchKeyword ?? ''}
+        onSubmitted={(ids) => {
+          // 注册这批 BgTask id，等它们 done 时自动加引用
+          for (const id of ids) pendingVideoExtractIdsRef.current.add(id)
+        }}
       />
     </div>
   )

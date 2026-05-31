@@ -152,10 +152,80 @@ function bumpProgress(taskId: string, target: number, step = 0.6) {
   return () => clearInterval(t)
 }
 
+/** 真正跑视频解析流程的内部函数：复用已经存在的 BgTask 条目 */
+async function runVideoExtract(
+  id: string,
+  input: { url: string; hint?: string },
+): Promise<{ courseId: string; title: string } | null> {
+  const store = useBgTasks.getState()
+  let stopRotate: (() => void) | null = null
+  let stopBump: (() => void) | null = null
+  try {
+    // 阶段 1：提交 → 轮询
+    stopRotate = rotateLabel(id, SUBTITLE_STEPS)
+    stopBump = bumpProgress(id, 50)
+    store.patch(id, { stage: 'subtitle', stageLabel: SUBTITLE_STEPS[0], progress: 4 })
+    const submit = await api<{ taskId: string }>('/extract/video', {
+      method: 'POST',
+      json: { url: input.url },
+    })
+    const cozeTaskId = submit.taskId
+    while (true) {
+      if (!isLive(id)) return null
+      await new Promise((r) => setTimeout(r, 3000))
+      const row = await api<any>(`/extract/video/${cozeTaskId}`).catch(() => null)
+      if (!row) continue
+      if (row.status === 'completed') {
+        stopRotate?.()
+        stopBump?.()
+        store.patch(id, { stage: 'outline', progress: 55, stageLabel: OUTLINE_STEPS[0] })
+        stopRotate = rotateLabel(id, OUTLINE_STEPS)
+        stopBump = bumpProgress(id, 92)
+        const content = (row.plainText || row.subtitleText || '').trim()
+        if (!content) throw new Error('无字幕内容（可能无人声视频）')
+        const data = await api<{ id: string; title: string }>('/ai/extract-course', {
+          method: 'POST',
+          json: { sourceUrl: input.url, content, hint: input.hint },
+        })
+        if (!data?.id) throw new Error('AI 大纲生成失败')
+        stopRotate?.()
+        stopBump?.()
+        const finished = {
+          stage: 'done' as const,
+          progress: 100,
+          endedAt: Date.now(),
+          result: data,
+          resultPath: `/course/${data.id}`,
+          resultLabel: '查看课程',
+        }
+        store.patch(id, finished)
+        await maybeNotify(
+          { ...store.tasks.find((t) => t.id === id)!, ...finished },
+          '✨ 课程大纲已就绪',
+          `《${data.title}》已生成，点击查看`,
+        )
+        return { courseId: data.id, title: data.title }
+      }
+      if (row.status === 'failed' || row.status === 'cancelled') {
+        throw new Error(row.error || '视频解析失败')
+      }
+    }
+  } catch (e: any) {
+    stopRotate?.()
+    stopBump?.()
+    const msg = String(e?.message ?? e).slice(0, 200)
+    store.patch(id, { stage: 'error', error: msg, endedAt: Date.now() })
+    const t = useBgTasks.getState().tasks.find((x) => x.id === id)
+    if (t) await maybeNotify(t, '⚠️ 视频解析失败', msg)
+    return null
+  }
+}
+
 /** 视频字幕解析 + AI 大纲生成（两段流水线） */
 export function startVideoExtract(input: {
   url: string
   hint?: string
+  title?: string
   notifyOnComplete?: boolean
 }): { id: string; promise: Promise<{ courseId: string; title: string } | null> } {
   const id = nanoid()
@@ -163,7 +233,7 @@ export function startVideoExtract(input: {
   store.add({
     id,
     kind: 'video-extract',
-    title: '提取视频字幕 + 生成课程大纲',
+    title: input.title ?? '提取视频字幕 + 生成课程大纲',
     emoji: '🎙',
     stage: 'submitting',
     stageLabel: SUBTITLE_STEPS[0],
@@ -173,68 +243,58 @@ export function startVideoExtract(input: {
     notified: false,
     inBackground: false,
   })
+  return { id, promise: runVideoExtract(id, input) }
+}
 
-  const promise = (async () => {
-    let stopRotate: (() => void) | null = null
-    let stopBump: (() => void) | null = null
-    try {
-      // 阶段 1：提交 → 轮询
-      stopRotate = rotateLabel(id, SUBTITLE_STEPS)
-      stopBump = bumpProgress(id, 50)
-      store.patch(id, { stage: 'subtitle' })
-      const submit = await api<{ taskId: string }>('/extract/video', {
-        method: 'POST',
-        json: { url: input.url },
+/**
+ * 批量启动多个视频解析任务，并发上限 = concurrency。
+ *
+ * 策略：先把 N 个 BgTask 全部注册到 store 里（用户立刻能在浮窗看到 N 条「⏳ 排队等待」），
+ * 再用一个简单的内部 worker 按 concurrency 出列，只有出列的才真正调用 Coze。
+ */
+export function startVideoExtractsBatched(
+  items: { url: string; hint?: string; title?: string }[],
+  concurrency = 3,
+  notifyOnComplete = false,
+): { ids: string[] } {
+  const store = useBgTasks.getState()
+  // 1. 先一次性注册所有任务，让用户立即看到完整列表
+  const queue = items.map((it) => {
+    const id = nanoid()
+    store.add({
+      id,
+      kind: 'video-extract',
+      title: it.title ?? '提取视频字幕 + 生成课程大纲',
+      emoji: '🎙',
+      stage: 'submitting',
+      stageLabel: '⏳ 排队等待中…',
+      progress: 0,
+      startedAt: Date.now(),
+      notifyOnComplete,
+      notified: false,
+      inBackground: false,
+    })
+    return { id, input: { url: it.url, hint: it.hint } }
+  })
+
+  // 2. worker 池：最多 concurrency 个并发执行
+  let active = 0
+  let cursor = 0
+  const tick = () => {
+    while (active < concurrency && cursor < queue.length) {
+      const job = queue[cursor++]
+      // 如果用户在排队期间就取消了，直接跳过
+      const t = useBgTasks.getState().tasks.find((x) => x.id === job.id)
+      if (!t || t.stage === 'cancelled') continue
+      active++
+      runVideoExtract(job.id, job.input).finally(() => {
+        active--
+        tick()
       })
-      const cozeTaskId = submit.taskId
-      while (true) {
-        if (!isLive(id)) return null
-        await new Promise((r) => setTimeout(r, 3000))
-        const row = await api<any>(`/extract/video/${cozeTaskId}`).catch(() => null)
-        if (!row) continue
-        if (row.status === 'completed') {
-          stopRotate?.()
-          stopBump?.()
-          store.patch(id, { stage: 'outline', progress: 55, stageLabel: OUTLINE_STEPS[0] })
-          stopRotate = rotateLabel(id, OUTLINE_STEPS)
-          stopBump = bumpProgress(id, 92)
-          const content = (row.plainText || row.subtitleText || '').trim()
-          if (!content) throw new Error('无字幕内容（可能无人声视频）')
-          const data = await api<{ id: string; title: string }>('/ai/extract-course', {
-            method: 'POST',
-            json: { sourceUrl: input.url, content, hint: input.hint },
-          })
-          if (!data?.id) throw new Error('AI 大纲生成失败')
-          stopRotate?.()
-          stopBump?.()
-          const finished = {
-            stage: 'done' as const,
-            progress: 100,
-            endedAt: Date.now(),
-            result: data,
-            resultPath: `/course/${data.id}`,
-            resultLabel: '查看课程',
-          }
-          store.patch(id, finished)
-          await maybeNotify({ ...store.tasks.find((t) => t.id === id)!, ...finished }, '✨ 课程大纲已就绪', `《${data.title}》已生成，点击查看`)
-          return { courseId: data.id, title: data.title }
-        }
-        if (row.status === 'failed' || row.status === 'cancelled') {
-          throw new Error(row.error || '视频解析失败')
-        }
-      }
-    } catch (e: any) {
-      stopRotate?.()
-      stopBump?.()
-      const msg = String(e?.message ?? e).slice(0, 200)
-      store.patch(id, { stage: 'error', error: msg, endedAt: Date.now() })
-      const t = useBgTasks.getState().tasks.find((x) => x.id === id)
-      if (t) await maybeNotify(t, '⚠️ 视频解析失败', msg)
-      return null
     }
-  })()
-
-  return { id, promise }
+  }
+  tick()
+  return { ids: queue.map((q) => q.id) }
 }
 
 /** AI 生成学习计划 */

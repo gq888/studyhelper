@@ -8,6 +8,17 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  /*
+   * 底部导航栏占用高度，用于让 fixed bottom 元素 / 满屏 flex 容器精确避开它。
+   * 桌面（>= md）走 SideNav，BottomNav 隐藏 → 0px。
+   * 移动端：BottomNav 内容约 68px + iPhone Home Indicator (safe-bottom)。
+   */
+  --bottom-nav-h: 0px;
+}
+@media (max-width: 767.98px) {
+  :root {
+    --bottom-nav-h: calc(68px + var(--safe-bottom));
+  }
 }
 
 html, body, #root {

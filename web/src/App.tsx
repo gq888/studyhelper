@@ -49,7 +49,7 @@ export default function App() {
   return (
     <div className="flex min-h-full bg-paper">
       <SideNav />
-      <main className="relative flex-1 pb-24 md:pb-6">
+      <main className="relative flex-1 pb-[var(--bottom-nav-h)] md:pb-6">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
